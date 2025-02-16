@@ -1,4 +1,4 @@
-a# LLMediCare: AI-Powered Healthcare Assistant
+# LLMediCare: AI-Powered Healthcare Assistant
 
 LLMediCare is a comprehensive AI-powered healthcare management platform designed to empower both patients and healthcare professionals with advanced tools for seamless interactions. The platform integrates AI/ML models and NLP capabilities to provide intelligent healthcare recommendations, symptom checking, and efficient patient management. 
 
