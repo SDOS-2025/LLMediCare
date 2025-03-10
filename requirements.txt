@@ -1,0 +1,10 @@
+# Backend dependencies
+fastapi==0.104.1
+uvicorn==0.24.0
+langchain==0.0.352
+python-dotenv==1.0.0
+llama-cpp-python==0.2.56
+pandas==2.1.4
+
+# CORS middleware
+python-multipart==0.0.6
