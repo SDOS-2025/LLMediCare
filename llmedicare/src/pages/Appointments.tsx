@@ -1,12 +1,30 @@
-import React, { useState } from 'react';
+import React from 'react';
+import { useDispatch, useSelector } from 'react-redux';
 import { AppointmentForm } from '../components/appointments/AppointmentForm';
 import { Calendar } from 'lucide-react';
+import { addAppointment } from '../store/slices/appointmentSlice';
+import type { RootState } from '../store/store';
 
 export const Appointments: React.FC = () => {
-  const [appointments, setAppointments] = useState([]);
+  const dispatch = useDispatch();
+  const appointments = useSelector((state: RootState) => state.appointments.appointments);
+  const user = useSelector((state: RootState) => state.auth.user);
 
-  const handleNewAppointment = (appointment: any) => {
-    setAppointments([...appointments, { ...appointment, id: Date.now() }]);
+  const handleNewAppointment = (appointment: {
+    date: string;
+    time: string;
+    type: string;
+    description: string;
+  }) => {
+    if (!user) return;
+
+    const newAppointment = {
+      ...appointment,
+      id: Date.now().toString(),
+      userId: user.uid,
+    };
+
+    dispatch(addAppointment(newAppointment));
   };
 
   return (
@@ -31,7 +49,7 @@ export const Appointments: React.FC = () => {
             Upcoming Appointments
           </h3>
           <div className="space-y-4">
-            {appointments.map((apt: any) => (
+            {appointments.map((apt) => (
               <div
                 key={apt.id}
                 className="bg-white shadow overflow-hidden sm:rounded-lg"
