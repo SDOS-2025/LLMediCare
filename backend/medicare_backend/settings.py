@@ -125,3 +125,13 @@ CORS_ALLOW_ALL_ORIGINS = True  # Only for development
 
 # Custom user model
 AUTH_USER_MODEL = 'users.User'
+
+# AI Model Configuration
+AI_MODEL_TYPE = 'llama'
+LLAMA_MODEL_PATH = os.path.join(BASE_DIR.parent, 'models', 'llama-2-7b-chat.gguf')
+AI_MODEL_CONFIG = {
+    'max_tokens': 2000,
+    'temperature': 0.7,
+    'top_p': 0.95,
+    'context_window': 4096,
+}

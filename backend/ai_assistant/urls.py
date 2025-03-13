@@ -4,7 +4,8 @@ from .views import (
     ChatSessionViewSet,
     AgentActionViewSet,
     HealthRecommendationViewSet,
-    SymptomCheckViewSet
+    SymptomCheckViewSet,
+    ModelStatusView,
 )
 
 router = DefaultRouter()
@@ -15,4 +16,5 @@ router.register(r'symptom-checks', SymptomCheckViewSet, basename='symptom-check'
 
 urlpatterns = [
     path('', include(router.urls)),
+    path('model/status/', ModelStatusView.as_view(), name='model-status'),
 ]

@@ -6,10 +6,11 @@ import { Header } from '../components/Header';
 import Sidebar from '../components/Sidebar';
 import { Link } from 'react-router-dom';
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
+import axios from 'axios';
 
 export default function ChatInterface() {
   const dispatch = useDispatch();
-  const { sessions, currentSession, messages, loading, error } = useSelector((state) => state.chat);
+  const { sessions, currentSession, messages, loading } = useSelector((state) => state.chat);
   const user = useSelector((state) => state.auth.user);
   
   const [inputMessage, setInputMessage] = useState('');
@@ -17,6 +18,7 @@ export default function ChatInterface() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [authUser, setAuthUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
+  const [modelStatus, setModelStatus] = useState(null);
 
   const toggleSidebar = () => {
     setSidebarOpen(!sidebarOpen);
@@ -48,61 +50,36 @@ export default function ChatInterface() {
       
       dispatch(setLoading(true));
       try {
-        // In a real app, you would fetch from the API
-        // For now, we'll use mock data
-        const mockSessions = [
-          {
-            id: 1,
-            created_at: '2025-03-12T10:30:00Z',
-            title: 'Consultation about headache'
-          },
-          {
-            id: 2,
-            created_at: '2025-03-10T14:45:00Z',
-            title: 'Questions about medication'
+        // Check model status first
+        try {
+          const modelStatusResponse = await axios.get('/api/ai-assistant/model/status/');
+          setModelStatus(modelStatusResponse.data);
+          console.log('Model status:', modelStatusResponse.data);
+          
+          if (modelStatusResponse.data.status === 'error') {
+            dispatch(setError(modelStatusResponse.data.message || 'AI model is not available'));
+            return;
           }
-        ];
+        } catch (err) {
+          console.error('Error checking model status:', err);
+          dispatch(setError('Unable to connect to AI model. Please try again later.'));
+          return;
+        }
         
-        dispatch(setSessions(mockSessions));
+        // Fetch chat sessions from the API
+        const sessionsResponse = await axios.get('/api/ai-assistant/chat-sessions/');
+        const sessions = sessionsResponse.data;
         
-        // Set the current session to the most recent one
-        if (mockSessions.length > 0 && !currentSession) {
-          const recentSession = mockSessions[0];
+        dispatch(setSessions(sessions));
+        
+        // Set the current session to the most recent one if not already set
+        if (sessions.length > 0 && !currentSession) {
+          const recentSession = sessions[0];
           dispatch(setCurrentSession(recentSession));
           
           // Fetch messages for this session
-          const mockMessages = [
-            {
-              id: 1,
-              session_id: 1,
-              sender: 'user',
-              content: 'I have been experiencing frequent headaches recently.',
-              created_at: '2025-03-12T10:30:15Z'
-            },
-            {
-              id: 2,
-              session_id: 1,
-              sender: 'assistant',
-              content: "I'm sorry to hear that you're experiencing frequent headaches. Can you tell me more about the nature of these headaches? For example, where is the pain located, how long do they last, and are there any triggers you've noticed?",
-              created_at: '2025-03-12T10:30:30Z'
-            },
-            {
-              id: 3,
-              session_id: 1,
-              sender: 'user',
-              content: 'They usually start at the front of my head and last for several hours. I notice they get worse when I stare at a screen for too long.',
-              created_at: '2025-03-12T10:31:00Z'
-            },
-            {
-              id: 4,
-              session_id: 1,
-              sender: 'assistant',
-              content: "Based on what you've described, it sounds like you might be experiencing tension headaches, which can be triggered by prolonged screen time. This is quite common, especially if you work at a computer. I would recommend taking regular breaks from screen time (try the 20-20-20 rule: every 20 minutes, look at something 20 feet away for 20 seconds), ensuring proper ergonomics at your workstation, and staying hydrated. Over-the-counter pain relievers like ibuprofen can help with symptoms. If the headaches persist or worsen, I would recommend seeing a healthcare provider for a more thorough evaluation.",
-              created_at: '2025-03-12T10:31:30Z'
-            }
-          ];
-          
-          dispatch(setMessages(mockMessages));
+          const messagesResponse = await axios.get(`/api/ai-assistant/chat-sessions/${recentSession.id}/messages/`);
+          dispatch(setMessages(messagesResponse.data));
         }
       } catch (err) {
         console.error('Error fetching chat data:', err);
@@ -115,12 +92,12 @@ export default function ChatInterface() {
     fetchData();
   }, [dispatch, authUser, currentSession]);
 
-  const handleSendMessage = (e) => {
+  const handleSendMessage = async (e) => {
     e.preventDefault();
     
     if (!inputMessage.trim() || !currentSession) return;
     
-    // Add user message
+    // Add user message immediately for better UX
     const userMessage = {
       id: Date.now(),
       session_id: currentSession.id,
@@ -128,22 +105,87 @@ export default function ChatInterface() {
       content: inputMessage,
       created_at: new Date().toISOString()
     };
-    
     dispatch(addMessage(userMessage));
-    setInputMessage('');
     
-    // Simulate AI response after a short delay
-    setTimeout(() => {
-      const aiMessage = {
-        id: Date.now() + 1,
+    // Show loading indicator for AI response
+    const loadingMessage = {
+      id: Date.now() + 1,
+      session_id: currentSession.id,
+      sender: 'assistant',
+      content: 'Thinking...',
+      created_at: new Date().toISOString(),
+      isLoading: true
+    };
+    dispatch(addMessage(loadingMessage));
+    
+    try {
+      // Check model status before sending message
+      const modelStatusResponse = await axios.get('/api/ai-assistant/model/status/');
+      if (modelStatusResponse.data.status === 'error') {
+        throw new Error(modelStatusResponse.data.message || 'AI model is not available');
+      }
+      
+      // Send message to backend with timeout
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+      
+      const response = await axios.post(
+        `/api/ai-assistant/chat-sessions/${currentSession.id}/messages/`,
+        { content: inputMessage },
+        { signal: controller.signal }
+      );
+      
+      clearTimeout(timeout);
+      
+      // Remove loading message
+      dispatch(setMessages(messages.filter(m => !m.isLoading)));
+      
+      // Add AI response to the chat
+      if (response.data && response.data.content) {
+        dispatch(addMessage({
+          id: response.data.id || Date.now() + 2,
+          session_id: currentSession.id,
+          sender: 'assistant',
+          content: response.data.content,
+          created_at: response.data.created_at || new Date().toISOString()
+        }));
+      } else {
+        throw new Error('Invalid response format from server');
+      }
+      
+      setInputMessage('');
+    } catch (error) {
+      console.error('Error sending message:', error);
+      // Remove loading message
+      dispatch(setMessages(messages.filter(m => !m.isLoading)));
+      
+      // Add error message to chat with more helpful information
+      let errorMessage = 'Sorry, I encountered an error processing your message. Please try again.';
+      
+      if (error.name === 'AbortError') {
+        errorMessage = 'The request took too long to process. Please try again.';
+      } else if (error.response) {
+        if (error.response.status === 500) {
+          errorMessage = 'The AI model is currently initializing. Please try again in a moment.';
+        } else if (error.response.status === 404) {
+          errorMessage = 'The chat service is unavailable. Please check your connection.';
+        } else if (error.response.data && error.response.data.detail) {
+          errorMessage = `Error: ${error.response.data.detail}`;
+        }
+      } else if (error.request) {
+        errorMessage = 'No response received from the server. Please check your connection.';
+      } else {
+        errorMessage = error.message || errorMessage;
+      }
+      
+      dispatch(addMessage({
+        id: Date.now() + 2,
         session_id: currentSession.id,
         sender: 'assistant',
-        content: "I'm analyzing your message. In a production environment, this would be processed by our AI model to generate a helpful medical response tailored to your query.",
+        content: errorMessage,
         created_at: new Date().toISOString()
-      };
-      
-      dispatch(addMessage(aiMessage));
-    }, 1000);
+      }));
+    }
   };
 
   const createNewSession = () => {
@@ -158,76 +200,23 @@ export default function ChatInterface() {
     dispatch(setMessages([]));
   };
 
-  const switchSession = (sessionId) => {
+  const switchSession = async (sessionId) => {
     const session = sessions.find(s => s.id === sessionId);
     if (session) {
       dispatch(setCurrentSession(session));
+      dispatch(setLoading(true));
       
-      // In a real app, you would fetch messages for this session from the API
-      // For now, let's simulate different messages for different sessions
-      const mockMessages = sessionId === 1 
-        ? [
-            {
-              id: 1,
-              session_id: 1,
-              sender: 'user',
-              content: 'I have been experiencing frequent headaches recently.',
-              created_at: '2025-03-12T10:30:15Z'
-            },
-            {
-              id: 2,
-              session_id: 1,
-              sender: 'assistant',
-              content: "I'm sorry to hear that you're experiencing frequent headaches. Can you tell me more about the nature of these headaches? For example, where is the pain located, how long do they last, and are there any triggers you've noticed?",
-              created_at: '2025-03-12T10:30:30Z'
-            },
-            {
-              id: 3,
-              session_id: 1,
-              sender: 'user',
-              content: 'They usually start at the front of my head and last for several hours. I notice they get worse when I stare at a screen for too long.',
-              created_at: '2025-03-12T10:31:00Z'
-            },
-            {
-              id: 4,
-              session_id: 1,
-              sender: 'assistant',
-              content: "Based on what you've described, it sounds like you might be experiencing tension headaches, which can be triggered by prolonged screen time. This is quite common, especially if you work at a computer. I would recommend taking regular breaks from screen time (try the 20-20-20 rule: every 20 minutes, look at something 20 feet away for 20 seconds), ensuring proper ergonomics at your workstation, and staying hydrated. Over-the-counter pain relievers like ibuprofen can help with symptoms. If the headaches persist or worsen, I would recommend seeing a healthcare provider for a more thorough evaluation.",
-              created_at: '2025-03-12T10:31:30Z'
-            }
-          ]
-        : [
-            {
-              id: 5,
-              session_id: 2,
-              sender: 'user',
-              content: 'I was prescribed Lisinopril for my blood pressure. Are there any side effects I should be aware of?',
-              created_at: '2025-03-10T14:45:15Z'
-            },
-            {
-              id: 6,
-              session_id: 2,
-              sender: 'assistant',
-              content: "Lisinopril is an ACE inhibitor commonly used to treat high blood pressure. Common side effects may include dizziness, lightheadedness, dry cough, and increased potassium levels. Less common but more serious side effects include swelling of the face/lips/tongue/throat, difficulty breathing, or signs of infection like fever or sore throat. It's important to take this medication regularly as prescribed, and if you experience any concerning side effects, especially severe dizziness or difficulty breathing, contact your healthcare provider immediately. Also, be sure to inform your doctor of all other medications you're taking, as some drugs can interact with Lisinopril.",
-              created_at: '2025-03-10T14:45:45Z'
-            },
-            {
-              id: 7,
-              session_id: 2,
-              sender: 'user',
-              content: 'I have been experiencing a dry cough since starting the medication. Is this normal?',
-              created_at: '2025-03-10T14:46:30Z'
-            },
-            {
-              id: 8,
-              session_id: 2,
-              sender: 'assistant',
-              content: "Yes, a persistent dry cough is one of the most common side effects of ACE inhibitors like Lisinopril, affecting about 5-35% of patients. This cough typically doesn't go away with cough medicines and may persist as long as you're taking the medication. If the cough is severely bothering you, speak with your doctor - they might consider switching you to a different type of blood pressure medication, such as an ARB (Angiotensin Receptor Blocker), which has similar benefits but is less likely to cause a cough. Don't stop taking your medication without consulting your healthcare provider first.",
-              created_at: '2025-03-10T14:47:00Z'
-            }
-          ];
-      
-      dispatch(setMessages(mockMessages));
+      try {
+        // Fetch messages for the selected session from the API
+        const response = await axios.get(`/api/ai-assistant/chat-sessions/${sessionId}/messages/`);
+        dispatch(setMessages(response.data));
+      } catch (error) {
+        console.error('Error fetching messages:', error);
+        dispatch(setError('Failed to load messages. Please try again.'));
+        dispatch(setMessages([])); // Clear messages on error
+      } finally {
+        dispatch(setLoading(false));
+      }
     }
   };
 

@@ -2,18 +2,20 @@ import requests
 import json
 from datetime import datetime, timedelta
 import os
-# import openai
+import logging
+import openai
 from django.conf import settings
 from django.db.models import Q
+from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline
+from langchain import PromptTemplate, LLMChain
+from langchain.llms import HuggingFacePipeline
 
 from .models import ChatMessage, SymptomCheck, HealthRecommendation, AgentAction
 from users.models import User
 from appointments.models import Appointment, AvailabilitySlot
 from medical_records.models import MedicalRecord, Medication
 
-# Configure OpenAI API
-if hasattr(settings, 'OPENAI_API_KEY'):
-    openai.api_key = settings.OPENAI_API_KEY
+logger = logging.getLogger(__name__)
 
 class AIAssistantService:
     """
@@ -21,6 +23,42 @@ class AIAssistantService:
     """
     def __init__(self, user=None):
         self.user = user
+        self.model_type = getattr(settings, 'AI_MODEL_TYPE', 'llama')
+        
+        # Initialize the selected model
+        if self.model_type == 'llama':
+            try:
+                # Initialize Llama model
+                self._init_llama_model()
+            except Exception as e:
+                logger.error(f"Error initializing Llama model: {e}")
+                self.model_type = 'rule_based'  # Fallback to rule-based if model fails
+        elif self.model_type == 'huggingface':
+            self.model_name = getattr(settings, 'HUGGINGFACE_MODEL_NAME', 'microsoft/BioGPT-Large')
+            try:
+                # Initialize HuggingFace model
+                self._init_huggingface_model()
+            except Exception as e:
+                logger.error(f"Error initializing HuggingFace model: {e}")
+                self.model_type = 'rule_based'  # Fallback to rule-based if model fails
+        
+        # System prompt for medical assistant
+        self.system_prompt = """
+        You are a helpful and empathetic AI medical assistant. Your purpose is to provide general health information, 
+        assist with symptom checking, help schedule appointments, set medication reminders, and offer health recommendations.
+        
+        Guidelines:
+        1. Always maintain a professional, compassionate tone.
+        2. Clearly state that you are an AI assistant and not a medical professional.
+        3. For serious medical concerns, always encourage users to consult healthcare professionals.
+        4. Protect user privacy and confidentiality.
+        5. Provide evidence-based information when possible.
+        6. Avoid making definitive diagnoses.
+        7. Be honest about your limitations.
+        8. Focus on being helpful while prioritizing user safety.
+        
+        Remember that your advice is not a substitute for professional medical care.
+        """
     
     def process_message(self, session, message_content):
         """
@@ -65,6 +103,7 @@ class AIAssistantService:
         """
         # Use OpenAI to identify intent if API key is available
         if hasattr(settings, 'OPENAI_API_KEY'):
+            openai.api_key = settings.OPENAI_API_KEY
             try:
                 response = openai.ChatCompletion.create(
                     model="gpt-3.5-turbo",
@@ -113,9 +152,124 @@ class AIAssistantService:
         else:
             return 'general'
     
+    def _init_llama_model(self):
+        """
+        Initialize LLaMA model for text generation using a pre-downloaded model with optimized settings
+        """
+        try:
+            from langchain.llms import LlamaCpp
+            from langchain.callbacks.manager import CallbackManager
+            from langchain.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
+            from langchain.chains import LLMChain
+            from langchain.prompts import PromptTemplate
+            import os
+            import psutil
+            import gc
+            
+            # Force garbage collection before loading model
+            gc.collect()
+            
+            # Check available memory
+            available_memory = psutil.virtual_memory().available / (1024 * 1024 * 1024)  # Convert to GB
+            if available_memory < 8:  # Require minimum 8GB free RAM
+                logger.warning(f"Low memory available: {available_memory:.2f}GB. Recommended: 8GB free RAM.")
+                # Continue anyway but log warning
+            
+            # Get model path with error checking - using absolute path for reliability
+            base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+            model_path = os.path.join(base_dir, "models", "llama-2-7b-chat.gguf")
+            
+            logger.info(f"Looking for model at: {model_path}")
+            
+            if not os.path.exists(model_path):
+                logger.error(f"Model file not found at {model_path}")
+                # Try alternative path
+                alternative_path = os.path.abspath(os.path.join(base_dir, "..", "models", "llama-2-7b-chat.gguf"))
+                logger.info(f"Trying alternative path: {alternative_path}")
+                
+                if os.path.exists(alternative_path):
+                    model_path = alternative_path
+                    logger.info(f"Found model at alternative path: {model_path}")
+                else:
+                    logger.error(f"Model file not found at alternative path either: {alternative_path}")
+                    logger.info("Please run the download_model.py script to download the model")
+                    raise FileNotFoundError(f"Llama 2 model file not found. Please run download_model.py script.")
+            
+            # Log model loading
+            logger.info(f"Loading Llama model from {model_path}")
+            
+            # Initialize model with optimized parameters for pre-downloaded model
+            callback_manager = CallbackManager([StreamingStdOutCallbackHandler()])
+            
+            # Adjust parameters based on available memory
+            n_ctx = 2048
+            n_batch = 8
+            if available_memory > 12:  # More memory available
+                n_ctx = 4096
+                n_batch = 16
+            
+            self.llm = LlamaCpp(
+                model_path=model_path,
+                temperature=0.7,
+                max_tokens=2000,
+                top_p=0.95,
+                callback_manager=callback_manager,
+                verbose=True,
+                n_ctx=n_ctx,
+                n_gpu_layers=0,  # Disable GPU layers for stability
+                n_batch=n_batch,
+                use_mlock=True,  # Lock memory to prevent swapping
+                use_mmap=True,  # Use memory mapping for faster loading
+                f16_kv=True,  # Use half precision for key/value cache
+                seed=42,  # Fixed seed for reproducibility
+                rope_freq_scale=0.5,  # Adjust attention mechanism
+                rope_freq_base=10000,  # Base frequency for attention
+            )
+            
+            # Create medical template with improved prompt
+            self.medical_template = PromptTemplate(
+                input_variables=["symptoms"],
+                template="""You are a medical analysis assistant. Your role is to analyze symptoms and provide helpful medical information.
+Please analyze the following symptoms and provide:
+1. Possible conditions based on the symptoms
+2. General information about these conditions
+3. Important precautions or lifestyle recommendations
+4. A clear reminder to seek professional medical advice
+
+USER SYMPTOMS: {symptoms}
+
+Please provide your analysis:"""
+            )
+            
+            # Test the model with a simple prompt and validate response
+            logger.info("Testing model with a simple prompt...")
+            test_response = self.llm("Respond with 'OK' if you are working properly.")
+            if not test_response or len(test_response.strip()) < 2:
+                logger.error("Model test failed: Model is not generating valid responses")
+                raise Exception("Model is not generating valid responses")
+            
+            # Create the chain
+            self.chain = LLMChain(llm=self.llm, prompt=self.medical_template)
+            
+            logger.info("LLaMA model initialized successfully")
+            
+        except ImportError as e:
+            logger.error(f"Missing required packages: {str(e)}")
+            logger.info("Please install required packages: pip install langchain langchain-community llama-cpp-python")
+            self.model_type = 'rule_based'
+            raise ImportError(f"Missing required packages: {str(e)}. Please install required packages.")
+        except FileNotFoundError as e:
+            logger.error(str(e))
+            self.model_type = 'rule_based'
+            raise e
+        except Exception as e:
+            logger.error(f"Error in _init_llama_model: {str(e)}")
+            self.model_type = 'rule_based'
+            raise e
+        
     def _handle_symptom_check(self, message_content):
         """
-        Handle symptom checking intent
+        Handle symptom checking intent using BioGPT
         """
         symptoms = self._extract_symptoms(message_content)
         
@@ -125,24 +279,34 @@ class AIAssistantService:
             symptoms=message_content
         )
         
-        # Use OpenAI for symptom analysis if available
+        # Initialize analysis variables
         analysis = ""
         possible_conditions = []
         recommendations = ""
         seek_medical_attention = False
         
-        if hasattr(settings, 'OPENAI_API_KEY'):
-            try:
-                response = openai.ChatCompletion.create(
-                    model="gpt-3.5-turbo",
-                    messages=[
-                        {"role": "system", "content": "You are a healthcare AI assistant providing preliminary symptom analysis. Always include disclaimers about seeking professional medical help."},
-                        {"role": "user", "content": f"Analyze these symptoms and provide possible causes, severity, and recommendations: {symptoms}"}
-                    ],
-                    max_tokens=500
-                )
+        try:
+            # Create medical analysis prompt template
+            prompt_template = PromptTemplate(
+                input_variables=["symptoms"],
+                template="""As a medical AI assistant, please analyze the following symptoms:
+                {symptoms}
                 
-                analysis = response.choices[0].message.content
+                Provide a structured analysis including:
+                1. Possible conditions
+                2. Severity assessment
+                3. Recommendations
+                4. Whether immediate medical attention is needed
+                
+                Remember to maintain a professional tone and include appropriate medical disclaimers."""
+            )
+            
+            # Create LangChain for structured analysis
+            try:
+                chain = LLMChain(llm=self.llm, prompt=prompt_template)
+                
+                # Generate analysis
+                analysis = chain.run(symptoms=symptoms)
                 
                 # Basic rule to determine if medical attention is needed
                 severity_terms = ['severe', 'emergency', 'immediately', 'urgent', 'serious']
@@ -164,11 +328,13 @@ class AIAssistantService:
                         result="Medical attention recommended based on symptom analysis",
                         parameters={"symptoms": symptoms}
                     )
-                
+                    
             except Exception as e:
-                print(f"Error analyzing symptoms with OpenAI: {e}")
+                logger.error(f"Error in symptom analysis: {e}")
                 analysis = "I'm having trouble analyzing your symptoms right now. Please describe your symptoms in detail, and if you're experiencing severe pain or discomfort, please contact a healthcare professional immediately."
-        else:
+        
+        except Exception as e:
+            logger.error(f"Error in LLM setup: {e}")
             analysis = "Based on your symptoms, I recommend consulting with a healthcare professional for a proper diagnosis. Please note that this is not a medical diagnosis, and it's always best to consult with a qualified healthcare provider."
         
         return analysis
@@ -330,6 +496,7 @@ class AIAssistantService:
         
         # Generate personalized recommendation
         if hasattr(settings, 'OPENAI_API_KEY'):
+            openai.api_key = settings.OPENAI_API_KEY
             try:
                 # Get user health data for context
                 user_profile = self.user.patient_profile if hasattr(self.user, 'patient_profile') else None
@@ -502,36 +669,100 @@ class AIAssistantService:
     
     def _generate_general_response(self, session, message_content):
         """
-        Generate a general response for the user message
+        Generate a general response using the appropriate model
         """
-        # Use OpenAI to generate response if available
-        if hasattr(settings, 'OPENAI_API_KEY'):
-            try:
-                # Get conversation history for context (limit to last 10 messages)
-                conversation_history = list(session.messages.order_by('created_at')[:10])
-                messages = [
-                    {"role": "system", "content": "You are an AI healthcare assistant named LLMediCare Assistant. You provide helpful, accurate, and ethical health information. Always clarify that you're not a replacement for professional medical advice. Be empathetic, clear, and concise in your responses."}
-                ]
-                
-                for msg in conversation_history:
-                    role = "user" if msg.message_type == "user" else "assistant"
-                    messages.append({"role": role, "content": msg.content})
-                
-                # Add the current message
-                messages.append({"role": "user", "content": message_content})
-                
-                # Generate response
-                response = openai.ChatCompletion.create(
-                    model="gpt-3.5-turbo",
-                    messages=messages,
-                    max_tokens=500
-                )
-                
-                return response.choices[0].message.content
-                
-            except Exception as e:
-                print(f"Error generating response with OpenAI: {e}")
-                return "I'm having some trouble processing your request right now. Could you please try again or rephrase your question?"
-        else:
-            # Fallback response
-            return "I understand you have a question. For personalized health advice, please consult with a healthcare professional. Is there something specific about our services that I can help you with?"
+        try:
+            if self.model_type == 'llama':
+                # Use Llama model for response generation with validation
+                try:
+                    # Create a chat history context from previous messages
+                    chat_history = ""
+                    previous_messages = session.messages.order_by('created_at')[:10]  # Get last 10 messages for context
+                    
+                    if previous_messages.exists():
+                        for msg in previous_messages:
+                            prefix = "User: " if msg.message_type == 'user' else "Assistant: "
+                            chat_history += f"{prefix}{msg.content}\n"
+                    
+                    # Create a more conversational prompt template for general chat
+                    chat_template = PromptTemplate(
+                        input_variables=["chat_history", "question", "system_prompt"],
+                        template="""System: {system_prompt}
+
+Chat History:
+{chat_history}
+
+User: {question}
+
+Assistant: """
+                    )
+                    
+                    # Create a new chain for this conversation
+                    chat_chain = LLMChain(llm=self.llm, prompt=chat_template)
+                    
+                    # Generate response with context
+                    response = chat_chain.run(
+                        chat_history=chat_history,
+                        question=message_content,
+                        system_prompt=self.system_prompt
+                    )
+                    
+                    if not response or len(response.strip()) < 10:
+                        logger.warning("Generated response is too short or empty, falling back to simpler prompt")
+                        # Fallback to simpler prompt
+                        simple_template = PromptTemplate(
+                            input_variables=["question", "system_prompt"],
+                            template="""System: {system_prompt}
+
+User: {question}
+
+Assistant: """
+                        )
+                        simple_chain = LLMChain(llm=self.llm, prompt=simple_template)
+                        response = simple_chain.run(question=message_content, system_prompt=self.system_prompt)
+                    
+                    return response
+                except Exception as e:
+                    logger.error(f"Error in Llama response generation: {str(e)}")
+                    return "I apologize, but I'm having trouble processing your request right now. Please try again in a moment. If this persists, please contact support."
+            elif self.model_type == 'huggingface':
+                # Use HuggingFace model
+                try:
+                    inputs = self.tokenizer(message_content, return_tensors="pt", max_length=512, truncation=True)
+                    outputs = self.model.generate(**inputs, max_length=200, num_return_sequences=1)
+                    response = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
+                    if not response or len(response.strip()) < 10:
+                        raise ValueError("Invalid response generated")
+                    return response
+                except Exception as e:
+                    logger.error(f"Error in HuggingFace response generation: {str(e)}")
+                    return "I apologize, but I'm having trouble processing your request right now. Please try again in a moment."
+            else:
+                # Fallback to rule-based response with improved message
+                return self._generate_rule_based_response(message_content)
+            
+        except Exception as e:
+            logger.error(f"Error generating response: {e}")
+            return "Sorry, I encountered an error processing your message. Please try again or contact support if this persists."
+    
+    def _generate_rule_based_response(self, message_content):
+        """
+        Generate a rule-based response when AI models are unavailable
+        """
+        message_lower = message_content.lower()
+        
+        # Simple rule-based responses
+        if any(greeting in message_lower for greeting in ['hello', 'hi', 'hey', 'greetings']):
+            return "Hello! I'm your healthcare assistant. How can I help you today?"
+        
+        elif any(keyword in message_lower for keyword in ['thank', 'thanks', 'appreciate']):
+            return "You're welcome! Is there anything else I can help you with?"
+        
+        elif any(keyword in message_lower for keyword in ['bye', 'goodbye', 'see you']):
+            return "Goodbye! Take care of your health and feel free to return if you have more questions."
+        
+        elif any(keyword in message_lower for keyword in ['help', 'assist', 'support']):
+            return "I can help with health information, symptom checking, appointment scheduling, medication reminders, and health recommendations. What would you like assistance with?"
+        
+        # Default response
+        return "I'm currently operating in a limited capacity. I can provide basic information, but for more complex queries, please try again later when our AI services are fully operational."
