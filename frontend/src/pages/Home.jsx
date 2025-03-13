@@ -1,7 +1,113 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Button } from '../components/ui/Button';
 import styled from 'styled-components';
+import { Header } from '../components/Header';
+import Sidebar from '../components/Sidebar';
+
+export default function Home () {
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  const toggleSidebar = () => {
+    setSidebarOpen(!sidebarOpen);
+  };
+
+  return (
+    <AppContainer>
+      <Header toggleSidebar={toggleSidebar} sidebarOpen={sidebarOpen} />
+      <Sidebar isOpen={sidebarOpen} setIsOpen={setSidebarOpen} />
+      
+      <MainContent>
+        <HomeContainer>
+          <HeroSection>
+            <div className="mx-auto max-w-2xl py-32 sm:py-48 lg:py-56">
+              <div className="text-center">
+                <HeroTitle>Your AI-Powered Healthcare Assistant</HeroTitle>
+                <HeroText>
+                  Get instant medical advice, manage appointments, and access your health records all in one place.
+                  Experience the future of healthcare management.
+                </HeroText>
+                <div className="mt-10 flex items-center justify-center gap-x-6">
+                  <Link to="/chat">
+                    <Button size="lg">Start Chat</Button>
+                  </Link>
+                  <Link to="/appointments">
+                    <Button variant="outline" size="lg">Book Appointment</Button>
+                  </Link>
+                </div>
+              </div>
+            </div>
+          </HeroSection>
+
+          <FeaturesSection>
+            <FeaturesContainer>
+              <div className="mx-auto max-w-2xl lg:text-center">
+                <FeaturesTitle>Comprehensive Care</FeaturesTitle>
+                <FeaturesSubtitle>Everything you need for better health</FeaturesSubtitle>
+              </div>
+              <FeaturesList>
+                <FeaturesItem>
+                  <FeaturesIcon>
+                    <FeaturesIconSvg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <rect x="3" y="4" width="18" height="16" rx="2" stroke="currentColor" strokeWidth="2" />
+                      <circle cx="12" cy="10" r="2" stroke="currentColor" strokeWidth="2" />
+                      <path d="M16 16.2718C15.2045 15.469 ..." />
+                    </FeaturesIconSvg>
+                  </FeaturesIcon>
+                  <FeaturesItemTitle>AI Chat Assistant</FeaturesItemTitle>
+                  <FeaturesItemDescription>
+                    Get instant medical advice and preliminary evaluations from our AI-powered healthcare assistant.
+                  </FeaturesItemDescription>
+                </FeaturesItem>
+                <FeaturesItem>
+                  <FeaturesIcon>
+                    <FeaturesIconSvg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <rect x="3" y="4" width="18" height="16" rx="2" stroke="currentColor" strokeWidth="2" />
+                      <path d="M8 2V4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                      <path d="M16 2V4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                      <path d="M3 9H21" stroke="currentColor" strokeWidth="2" />
+                    </FeaturesIconSvg>
+                  </FeaturesIcon>
+                  <FeaturesItemTitle>Appointment Management</FeaturesItemTitle>
+                  <FeaturesItemDescription>
+                    Schedule and manage appointments with healthcare providers, both online and in-person.
+                  </FeaturesItemDescription>
+                </FeaturesItem>
+                <FeaturesItem>
+                  <FeaturesIcon>
+                    <FeaturesIconSvg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M14 2H6C5.46957 2 4.96086 2.21071 4.58579 2.58579C4.21071 2.96086 4 3.46957 4 4V20C4 20.5304 4.21071 21.0391 4.58579 21.4142C4.96086 21.7893 5.46957 22 6 22H18C18.5304 22 19.0391 21.7893 19.4142 21.4142C19.7893 21.0391 20 20.5304 20 20V8L14 2Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                      <path d="M14 2V8H20" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                      <path d="M16 13H8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                      <path d="M16 17H8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                      <path d="M10 9H9H8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                    </FeaturesIconSvg>
+                  </FeaturesIcon>
+                  <FeaturesItemTitle>Medical Records</FeaturesItemTitle>
+                  <FeaturesItemDescription>
+                    Securely store and access your medical history, prescriptions, and test results.
+                  </FeaturesItemDescription>
+                </FeaturesItem>
+              </FeaturesList>
+            </FeaturesContainer>
+          </FeaturesSection>
+        </HomeContainer>
+      </MainContent>
+    </AppContainer>
+  );
+};
+
+const AppContainer = styled.div`
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+`;
+
+const MainContent = styled.main`
+  margin-left: 72px; /* Width of collapsed sidebar */
+  margin-top: 64px; /* Height of header */
+  flex: 1;
+  transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+`;
 
 const HomeContainer = styled.div`
   background-color: white;
@@ -54,6 +160,10 @@ const FeaturesList = styled.dl`
   grid-template-columns: 1fr;
   gap: 8px 10px;
   margin-top: 16px;
+  
+  @media (min-width: 768px) {
+    grid-template-columns: repeat(3, 1fr);
+  }
 `;
 
 const FeaturesItem = styled.div`
@@ -95,81 +205,35 @@ const FeaturesItemDescription = styled.dd`
   color: #4b5563; // gray-600
 `;
 
-export const Home = () => {
-  return (
-    <HomeContainer>
-      <HeroSection>
-        <div className="mx-auto max-w-2xl py-32 sm:py-48 lg:py-56">
-          <div className="text-center">
-            <HeroTitle>Your AI-Powered Healthcare Assistant</HeroTitle>
-            <HeroText>
-              Get instant medical advice, manage appointments, and access your health records all in one place.
-              Experience the future of healthcare management.
-            </HeroText>
-            <div className="mt-10 flex items-center justify-center gap-x-6">
-              <Link to="/chat">
-                <Button size="lg">Start Chat</Button>
-              </Link>
-              <Link to="/appointments">
-                <Button variant="outline" size="lg">Book Appointment</Button>
-              </Link>
-            </div>
-          </div>
-        </div>
-      </HeroSection>
-
-      <FeaturesSection>
-        <FeaturesContainer>
-          <div className="mx-auto max-w-2xl lg:text-center">
-            <FeaturesTitle>Comprehensive Care</FeaturesTitle>
-            <FeaturesSubtitle>Everything you need for better health</FeaturesSubtitle>
-          </div>
-          <FeaturesList>
-            <FeaturesItem>
-              <FeaturesIcon>
-                <FeaturesIconSvg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <rect x="3" y="4" width="18" height="16" rx="2" stroke="currentColor" strokeWidth="2" />
-                  <circle cx="12" cy="10" r="2" stroke="currentColor" strokeWidth="2" />
-                  <path d="M16 16.2718C15.2045 15.469 ..." />
-                </FeaturesIconSvg>
-              </FeaturesIcon>
-              <FeaturesItemTitle>AI Chat Assistant</FeaturesItemTitle>
-              <FeaturesItemDescription>
-                Get instant medical advice and preliminary evaluations from our AI-powered healthcare assistant.
-              </FeaturesItemDescription>
-            </FeaturesItem>
-            <FeaturesItem>
-              <FeaturesIcon>
-                <FeaturesIconSvg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <rect x="3" y="4" width="18" height="16" rx="2" stroke="currentColor" strokeWidth="2" />
-                  <path d="M8 2V4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                  <path d="M16 2V4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                  <path d="M3 9H21" stroke="currentColor" strokeWidth="2" />
-                </FeaturesIconSvg>
-              </FeaturesIcon>
-              <FeaturesItemTitle>Appointment Management</FeaturesItemTitle>
-              <FeaturesItemDescription>
-                Schedule and manage appointments with healthcare providers, both online and in-person.
-              </FeaturesItemDescription>
-            </FeaturesItem>
-            <FeaturesItem>
-              <FeaturesIcon>
-                <FeaturesIconSvg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M14 2H6C5.46957 2 4.96086 2.21071 4.58579 2.58579C4.21071 2.96086 4 3.46957 4 4V20C4 20.5304 4.21071 21.0391 4.58579 21.4142C4.96086 21.7893 5.46957 22 6 22H18C18.5304 22 19.0391 21.7893 19.4142 21.4142C19.7893 21.0391 20 20.5304 20 20V8L14 2Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                  <path d="M14 2V8H20" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                  <path d="M16 13H8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                  <path d="M16 17H8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                  <path d="M10 9H9H8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                </FeaturesIconSvg>
-              </FeaturesIcon>
-              <FeaturesItemTitle>Medical Records</FeaturesItemTitle>
-              <FeaturesItemDescription>
-                Securely store and access your medical history, prescriptions, and test results.
-              </FeaturesItemDescription>
-            </FeaturesItem>
-          </FeaturesList>
-        </FeaturesContainer>
-      </FeaturesSection>
-    </HomeContainer>
-  );
-};
+const Button = styled.button`
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  padding: 0.5rem 1rem;
+  font-size: 1rem;
+  font-weight: 500;
+  border-radius: 0.375rem;
+  transition: all 0.2s ease-in-out;
+  cursor: pointer;
+  
+  ${props => props.variant === 'outline' ? `
+    background-color: transparent;
+    border: 1px solid #2563eb;
+    color: #2563eb;
+    &:hover {
+      background-color: rgba(37, 99, 235, 0.1);
+    }
+  ` : `
+    background-color: #2563eb;
+    border: 1px solid #2563eb;
+    color: white;
+    &:hover {
+      background-color: #1d4ed8;
+    }
+  `}
+  
+  ${props => props.size === 'lg' ? `
+    padding: 0.75rem 1.5rem;
+    font-size: 1.125rem;
+  ` : ''}
+`;

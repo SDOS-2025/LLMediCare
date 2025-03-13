@@ -1,31 +1,73 @@
-import React, { useState } from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { Provider } from 'react-redux';
 import { store } from './store/store';
-import { AuthProvider } from './components/auth/AuthProvider';
-import { Sidebar } from './components/layout/Sidebar';
-import { Header } from './components/layout/Header';
-import { Home } from './pages/Home';
-import { ChatInterface } from './components/chat/ChatInterface';
-import { Appointments } from './pages/Appointments';
-import { Records } from './pages/Records';
+import Home from './pages/Home';
+import ChatInterface from './pages/ChatInterface.jsx';
+import Appointments from './pages/Appointments.jsx';
+import Records from './pages/Records.jsx';
+import Login  from './pages/Login.jsx';
+import Profile from './pages/Profile.jsx';
+import { auth } from './utils/firebase-config.js';
+import { onAuthStateChanged } from 'firebase/auth';
 import styled from 'styled-components';
+
+// Protected Route Component
+function ProtectedRoute({ element }) {
+  const location = useLocation();
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  if (loading) return null; // Avoid redirect flicker
+
+  if (!user) {
+    alert('Log In required!');
+    return <Navigate to="/" state={{ from: location }} replace />;
+  }
+
+  return element;
+}
+
+export default function App() {
+
+  return (
+    <Provider store={store}>
+      <Router>
+        <AppContainer>
+          <div className="flex-1 flex flex-col">
+            <MainContent>
+              <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <Routes>
+                  <Route path="/home" element={<ProtectedRoute element={<Home />} />} />
+                  <Route path="/" element={<Login />} />
+                  <Route path="/chat" element={<ProtectedRoute element={<ChatInterface />} />} />
+                  <Route path="/appointments" element={<ProtectedRoute element={<Appointments />} />} />
+                  <Route path="/records" element={<ProtectedRoute element={<Records />} />} />
+                  <Route path="/profile" element={<ProtectedRoute element={<Profile />} />} />
+                </Routes>
+              </div>
+            </MainContent>
+          </div>
+        </AppContainer>
+      </Router>
+    </Provider>
+  );
+}
 
 const AppContainer = styled.div`
   display: flex;
   height: 100vh;
   overflow: hidden;
-  background-color: #f9fafb; // gray-50
-`;
-
-const SidebarContainer = styled.div`
-  transition: transform 0.3s ease-in-out;
-  ${props => props.sidebarOpen ? 'transform: translateX(0);' : 'transform: translateX(-100%);'}
-  position: fixed;
-  top: 0;
-  left: 0;
-  z-index: 40;
-  height: 100vh;
+  background-color: #f9fafb;
 `;
 
 const MainContent = styled.main`
@@ -33,43 +75,3 @@ const MainContent = styled.main`
   overflow-y: auto;
   padding: 20px;
 `;
-
-function App() {
-  const [sidebarOpen, setSidebarOpen] = useState(true);
-
-  const toggleSidebar = () => {
-    setSidebarOpen(!sidebarOpen);
-  };
-
-  return (
-    <Provider store={store}>
-      <AuthProvider>
-        <Router>
-          <AppContainer>
-            {/* Sidebar */}
-            <SidebarContainer sidebarOpen={sidebarOpen}>
-              <Sidebar />
-            </SidebarContainer>
-
-            {/* Main Content */}
-            <div className="flex-1 flex flex-col">
-              <Header toggleSidebar={toggleSidebar} sidebarOpen={sidebarOpen} />
-              <MainContent>
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                  <Routes>
-                    <Route path="/" element={<Home />} />
-                    <Route path="/chat" element={<ChatInterface />} />
-                    <Route path="/appointments" element={<Appointments />} />
-                    <Route path="/records" element={<Records />} />
-                  </Routes>
-                </div>
-              </MainContent>
-            </div>
-          </AppContainer>
-        </Router>
-      </AuthProvider>
-    </Provider>
-  );
-}
-
-export default App;

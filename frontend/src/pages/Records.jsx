@@ -1,124 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { setRecords, setDocuments, setMedications, setLoading, setError } from '../store/slices/recordsSlice';
+import { setRecords, setDocuments, setMedications, setLoading, setError } from '../store/slices/records-slice';
 import styled from 'styled-components';
-import { Button } from '../components/ui/Button';
 
-const RecordsContainer = styled.div`
-  max-width: 7xl;
-  margin: 0 auto;
-  padding: 24px;
-  background-color: #f9fafb; // gray-50
-`;
-
-const UploadFormContainer = styled.div`
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background-color: rgba(0, 0, 0, 0.5);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  z-index: 50;
-  padding: 24px;
-`;
-
-const UploadForm = styled.form`
-  background-color: #fff;
-  padding: 24px;
-  border-radius: 10px;
-  width: 100%;
-  max-width: 500px;
-`;
-
-const AddMedicationFormContainer = styled.div`
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background-color: rgba(0, 0, 0, 0.5);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  z-index: 50;
-  padding: 24px;
-`;
-
-const AddMedicationForm = styled.form`
-  background-color: #fff;
-  padding: 24px;
-  border-radius: 10px;
-  width: 100%;
-  max-width: 500px;
-`;
-
-const TabContainer = styled.div`
-  border-bottom: 1px solid #ddd;
-`;
-
-const TabButton = styled.button`
-  padding: 16px;
-  border: none;
-  border-bottom: 2px solid transparent;
-  font-size: 16px;
-  font-weight: 500;
-  cursor: pointer;
-  &.active {
-    border-bottom-color: #337ab7;
-    color: #337ab7;
-  }
-`;
-
-const TabContent = styled.div`
-  padding: 24px;
-`;
-
-const RecordList = styled.ul`
-  list-style: none;
-  padding: 0;
-  margin: 0;
-`;
-
-const RecordItem = styled.li`
-  padding: 16px;
-  border-bottom: 1px solid #ddd;
-  &:last-child {
-    border-bottom: none;
-  }
-`;
-
-const DocumentList = styled.ul`
-  list-style: none;
-  padding: 0;
-  margin: 0;
-`;
-
-const DocumentItem = styled.li`
-  padding: 16px;
-  border-bottom: 1px solid #ddd;
-  &:last-child {
-    border-bottom: none;
-  }
-`;
-
-const MedicationList = styled.ul`
-  list-style: none;
-  padding: 0;
-  margin: 0;
-`;
-
-const MedicationItem = styled.li`
-  padding: 16px;
-  border-bottom: 1px solid #ddd;
-  &:last-child {
-    border-bottom: none;
-  }
-`;
-
-export const Records = () => {
+export default function Records() {
   const dispatch = useDispatch();
   const { records, documents, medications, loading, error } = useSelector((state) => state.records);
   const user = useSelector((state) => state.auth.user);
@@ -626,3 +511,147 @@ export const Records = () => {
     </RecordsContainer>
   );
 };
+
+
+const RecordsContainer = styled.div`
+  max-width: 7xl;
+  margin: 0 auto;
+  padding: 24px;
+  background-color: #f9fafb; // gray-50
+`;
+
+const UploadFormContainer = styled.div`
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 50;
+  padding: 24px;
+`;
+
+const UploadForm = styled.form`
+  background-color: #fff;
+  padding: 24px;
+  border-radius: 10px;
+  width: 100%;
+  max-width: 500px;
+`;
+
+const AddMedicationFormContainer = styled.div`
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 50;
+  padding: 24px;
+`;
+
+const AddMedicationForm = styled.form`
+  background-color: #fff;
+  padding: 24px;
+  border-radius: 10px;
+  width: 100%;
+  max-width: 500px;
+`;
+
+const TabContainer = styled.div`
+  border-bottom: 1px solid #ddd;
+`;
+
+const TabButton = styled.button`
+  padding: 16px;
+  border: none;
+  border-bottom: 2px solid transparent;
+  font-size: 16px;
+  font-weight: 500;
+  cursor: pointer;
+  &.active {
+    border-bottom-color: #337ab7;
+    color: #337ab7;
+  }
+`;
+
+const TabContent = styled.div`
+  padding: 24px;
+`;
+
+const RecordList = styled.ul`
+  list-style: none;
+  padding: 0;
+  margin: 0;
+`;
+
+const RecordItem = styled.li`
+  padding: 16px;
+  border-bottom: 1px solid #ddd;
+  &:last-child {
+    border-bottom: none;
+  }
+`;
+
+const DocumentList = styled.ul`
+  list-style: none;
+  padding: 0;
+  margin: 0;
+`;
+
+const DocumentItem = styled.li`
+  padding: 16px;
+  border-bottom: 1px solid #ddd;
+  &:last-child {
+    border-bottom: none;
+  }
+`;
+
+const MedicationList = styled.ul`
+  list-style: none;
+  padding: 0;
+  margin: 0;
+`;
+
+const MedicationItem = styled.li`
+  padding: 16px;
+  border-bottom: 1px solid #ddd;
+  &:last-child {
+    border-bottom: none;
+  }
+`;
+
+const Button = styled.button`
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  padding: 0.5rem 1rem;
+  font-size: 1rem;
+  font-weight: 500;
+  border-radius: 0.375rem;
+  transition: all 0.2s ease-in-out;
+  cursor: pointer;
+  margin-top: 1rem;
+  
+  ${props => props.variant === 'outline' ? `
+    background-color: transparent;
+    border: 1px solid #337ab7;
+    color: #337ab7;
+    &:hover {
+      background-color: rgba(51, 122, 183, 0.1);
+    }
+  ` : `
+    background-color: #337ab7;
+    border: 1px solid #337ab7;
+    color: white;
+    &:hover {
+      background-color: #286090;
+    }
+  `}
+`;

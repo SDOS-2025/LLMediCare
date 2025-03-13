@@ -1,160 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { setAppointments, setLoading, setError } from '../store/slices/appointmentSlice';
+import { setAppointments, setLoading, setError } from '../store/slices/appointment-slice';
 import styled from 'styled-components';
-import { Button } from '../components/ui/Button';
 
-const AppointmentsContainer = styled.div`
-  max-width: 7xl;
-  margin: 0 auto;
-  padding: 24px;
-  background-color: #f9fafb; // gray-50
-`;
-
-const HeaderContainer = styled.div`
-  text-align: center;
-  margin-bottom: 8px;
-`;
-
-const HeaderTitle = styled.h2`
-  font-size: 24px;
-  font-weight: bold;
-  margin-bottom: 4px;
-`;
-
-const HeaderDescription = styled.p`
-  margin-bottom: 6px;
-`;
-
-const BookingFormContainer = styled.div`
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background-color: rgba(0, 0, 0, 0.75);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  padding: 4px;
-  z-index: 50;
-`;
-
-const BookingForm = styled.div`
-  background-color: #fff;
-  padding: 6px;
-  border-radius: 8px;
-  width: 100%;
-  max-width: 500px;
-`;
-
-const FormTitle = styled.h3`
-  font-size: 18px;
-  font-weight: bold;
-  margin-bottom: 4px;
-`;
-
-const FormLabel = styled.label`
-  display: block;
-  font-size: 14px;
-  font-weight: medium;
-  color: #333;
-  margin-bottom: 1px;
-`;
-
-const FormInput = styled.input`
-  width: 100%;
-  padding: 3px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  font-size: 14px;
-  margin-bottom: 4px;
-`;
-
-const FormSelect = styled.select`
-  width: 100%;
-  padding: 3px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  font-size: 14px;
-  margin-bottom: 4px;
-`;
-
-const FormTextarea = styled.textarea`
-  width: 100%;
-  padding: 3px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  font-size: 14px;
-  margin-bottom: 4px;
-`;
-
-const FormButtonContainer = styled.div`
-  display: flex;
-  justify-content: space-between;
-  margin-top: 4px;
-`;
-
-const TabContainer = styled.div`
-  background-color: #fff;
-  padding: 4px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  margin-bottom: 8px;
-`;
-
-const TabHeader = styled.div`
-  border-bottom: 1px solid #ddd;
-`;
-
-const TabNav = styled.nav`
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: -4px;
-`;
-
-const TabButton = styled.button`
-  padding: 4px 6px;
-  border: none;
-  border-radius: 4px 4px 0 0;
-  font-size: 14px;
-  font-weight: medium;
-  color: #333;
-  background-color: #fff;
-  cursor: pointer;
-`;
-
-const TabContent = styled.div`
-  padding: 4px;
-`;
-
-const AppointmentList = styled.ul`
-  list-style: none;
-  padding: 0;
-  margin: 0;
-`;
-
-const AppointmentItem = styled.li`
-  padding: 4px;
-  border-bottom: 1px solid #ddd;
-`;
-
-const AppointmentInfo = styled.div`
-  display: flex;
-  justify-content: space-between;
-`;
-
-const AppointmentStatus = styled.span`
-  display: inline-block;
-  padding: 2px 4px;
-  border-radius: 4px;
-  font-size: 12px;
-  font-weight: medium;
-  color: #fff;
-  background-color: #333;
-`;
-
-export const Appointments = () => {
+export default function Appointments() {
   const dispatch = useDispatch();
   const { appointments, loading, error } = useSelector((state) => state.appointments);
   const user = useSelector((state) => state.auth.user);
@@ -466,3 +315,231 @@ export const Appointments = () => {
     </AppointmentsContainer>
   );
 };
+
+
+const AppointmentsContainer = styled.div`
+  max-width: 7xl;
+  margin: 0 auto;
+  padding: 24px;
+  background-color: #f9fafb; // gray-50
+`;
+
+const HeaderContainer = styled.div`
+  text-align: center;
+  margin-bottom: 8px;
+`;
+
+const HeaderTitle = styled.h2`
+  font-size: 24px;
+  font-weight: bold;
+  margin-bottom: 4px;
+`;
+
+const HeaderDescription = styled.p`
+  margin-bottom: 6px;
+`;
+
+const BookingFormContainer = styled.div`
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.75);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 4px;
+  z-index: 50;
+`;
+
+const BookingForm = styled.div`
+  background-color: #fff;
+  padding: 6px;
+  border-radius: 8px;
+  width: 100%;
+  max-width: 500px;
+`;
+
+const FormTitle = styled.h3`
+  font-size: 18px;
+  font-weight: bold;
+  margin-bottom: 4px;
+`;
+
+const FormLabel = styled.label`
+  display: block;
+  font-size: 14px;
+  font-weight: medium;
+  color: #333;
+  margin-bottom: 1px;
+`;
+
+const FormInput = styled.input`
+  width: 100%;
+  padding: 3px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 14px;
+  margin-bottom: 4px;
+`;
+
+const FormSelect = styled.select`
+  width: 100%;
+  padding: 3px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 14px;
+  margin-bottom: 4px;
+`;
+
+const FormTextarea = styled.textarea`
+  width: 100%;
+  padding: 3px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 14px;
+  margin-bottom: 4px;
+`;
+
+const FormButtonContainer = styled.div`
+  display: flex;
+  justify-content: space-between;
+  margin-top: 4px;
+`;
+
+const TabContainer = styled.div`
+  background-color: #fff;
+  padding: 4px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  margin-bottom: 8px;
+`;
+
+const TabHeader = styled.div`
+  border-bottom: 1px solid #ddd;
+`;
+
+const TabNav = styled.nav`
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: -4px;
+`;
+
+const TabButton = styled.button`
+  padding: 4px 6px;
+  border: none;
+  border-radius: 4px 4px 0 0;
+  font-size: 14px;
+  font-weight: medium;
+  color: #333;
+  background-color: #fff;
+  cursor: pointer;
+`;
+
+const TabContent = styled.div`
+  padding: 4px;
+`;
+
+const AppointmentList = styled.ul`
+  list-style: none;
+  padding: 0;
+  margin: 0;
+`;
+
+const AppointmentItem = styled.li`
+  padding: 4px;
+  border-bottom: 1px solid #ddd;
+`;
+
+const AppointmentInfo = styled.div`
+  display: flex;
+  justify-content: space-between;
+`;
+
+const AppointmentStatus = styled.span`
+  display: inline-block;
+  padding: 2px 4px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: medium;
+  color: #fff;
+  background-color: #333;
+`;
+
+const Button = styled.button`
+  /* Base button styles */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 500;
+  border-radius: 0.375rem;
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+  padding: 0.5rem 1rem;
+  font-size: 1rem;
+  
+  /* Default primary style */
+  background-color: #2563eb;
+  border: 1px solid #2563eb;
+  color: white;
+  
+  &:hover:not(:disabled) {
+    background-color: #1d4ed8;
+    border-color: #1d4ed8;
+  }
+  
+  &:active:not(:disabled) {
+    background-color: #1e40af;
+    border-color: #1e40af;
+  }
+  
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+  
+  /* Variant: outline */
+  ${props => props.variant === 'outline' && `
+    background-color: transparent;
+    border: 1px solid #2563eb;
+    color: #2563eb;
+    
+    &:hover:not(:disabled) {
+      background-color: rgba(37, 99, 235, 0.05);
+    }
+    
+    &:active:not(:disabled) {
+      background-color: rgba(37, 99, 235, 0.1);
+    }
+  `}
+  
+  /* Size: small */
+  ${props => props.size === 'sm' && `
+    font-size: 0.875rem;
+    padding: 0.375rem 0.75rem;
+  `}
+  
+  /* Size: large */
+  ${props => props.size === 'lg' && `
+    font-size: 1.125rem;
+    padding: 0.75rem 1.5rem;
+  `}
+  
+  /* Handle custom className styles */
+  &.mb-6 {
+    margin-bottom: 1.5rem;
+  }
+  
+  &.text-red-600 {
+    color: #dc2626;
+  }
+  
+  &.border-red-300 {
+    border-color: #fca5a5;
+  }
+  
+  &.hover\\:bg-red-50:hover {
+    background-color: #fef2f2;
+  }
+`;

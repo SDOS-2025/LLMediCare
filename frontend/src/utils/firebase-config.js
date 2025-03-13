@@ -7,7 +7,7 @@ const firebaseConfig = {
   apiKey: "AIzaSyCb_-ML_c9NhdvNrGwG6pKQ6vBySkN7Gng",
   authDomain: "llmedicare-f27b0.firebaseapp.com",
   projectId: "llmedicare-f27b0",
-  storageBucket: "llmedicare-f27b0.appspot.com",
+  storageBucket: "llmedicare-f27b0.firebasestorage.app",
   messagingSenderId: "265307308848",
   appId: "1:265307308848:web:df3c5e9d7c670d05e8b629",
   measurementId: "G-G6YN1HNE0H"
@@ -15,6 +15,4 @@ const firebaseConfig = {
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-
-export { auth };
+export const auth = getAuth(app);
