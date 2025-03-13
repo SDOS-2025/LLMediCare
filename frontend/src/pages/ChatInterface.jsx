@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { setSessions, setCurrentSession, setMessages, addMessage, setLoading, setError } from '../store/slices/chat-slice';
+import { sendUserInput } from '../store/slices/sessionSlice';
 import styled from 'styled-components';
 import { Header } from '../components/Header';
 import Sidebar from '../components/Sidebar';
@@ -41,79 +41,6 @@ export default function ChatInterface() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
-  
-  useEffect(() => {
-    const fetchData = async () => {
-      if (!authUser) return;
-      
-      dispatch(setLoading(true));
-      try {
-        // In a real app, you would fetch from the API
-        // For now, we'll use mock data
-        const mockSessions = [
-          {
-            id: 1,
-            created_at: '2025-03-12T10:30:00Z',
-            title: 'Consultation about headache'
-          },
-          {
-            id: 2,
-            created_at: '2025-03-10T14:45:00Z',
-            title: 'Questions about medication'
-          }
-        ];
-        
-        dispatch(setSessions(mockSessions));
-        
-        // Set the current session to the most recent one
-        if (mockSessions.length > 0 && !currentSession) {
-          const recentSession = mockSessions[0];
-          dispatch(setCurrentSession(recentSession));
-          
-          // Fetch messages for this session
-          const mockMessages = [
-            {
-              id: 1,
-              session_id: 1,
-              sender: 'user',
-              content: 'I have been experiencing frequent headaches recently.',
-              created_at: '2025-03-12T10:30:15Z'
-            },
-            {
-              id: 2,
-              session_id: 1,
-              sender: 'assistant',
-              content: "I'm sorry to hear that you're experiencing frequent headaches. Can you tell me more about the nature of these headaches? For example, where is the pain located, how long do they last, and are there any triggers you've noticed?",
-              created_at: '2025-03-12T10:30:30Z'
-            },
-            {
-              id: 3,
-              session_id: 1,
-              sender: 'user',
-              content: 'They usually start at the front of my head and last for several hours. I notice they get worse when I stare at a screen for too long.',
-              created_at: '2025-03-12T10:31:00Z'
-            },
-            {
-              id: 4,
-              session_id: 1,
-              sender: 'assistant',
-              content: "Based on what you've described, it sounds like you might be experiencing tension headaches, which can be triggered by prolonged screen time. This is quite common, especially if you work at a computer. I would recommend taking regular breaks from screen time (try the 20-20-20 rule: every 20 minutes, look at something 20 feet away for 20 seconds), ensuring proper ergonomics at your workstation, and staying hydrated. Over-the-counter pain relievers like ibuprofen can help with symptoms. If the headaches persist or worsen, I would recommend seeing a healthcare provider for a more thorough evaluation.",
-              created_at: '2025-03-12T10:31:30Z'
-            }
-          ];
-          
-          dispatch(setMessages(mockMessages));
-        }
-      } catch (err) {
-        console.error('Error fetching chat data:', err);
-        dispatch(setError('Failed to load chat data. Please try again.'));
-      } finally {
-        dispatch(setLoading(false));
-      }
-    };
-    
-    fetchData();
-  }, [dispatch, authUser, currentSession]);
 
   const handleSendMessage = (e) => {
     e.preventDefault();
@@ -125,110 +52,20 @@ export default function ChatInterface() {
       id: Date.now(),
       session_id: currentSession.id,
       sender: 'user',
-      content: inputMessage,
+      message: inputMessage,
       created_at: new Date().toISOString()
     };
     
-    dispatch(addMessage(userMessage));
+    dispatch(sendUserInput(userMessage));
     setInputMessage('');
-    
-    // Simulate AI response after a short delay
-    setTimeout(() => {
-      const aiMessage = {
-        id: Date.now() + 1,
-        session_id: currentSession.id,
-        sender: 'assistant',
-        content: "I'm analyzing your message. In a production environment, this would be processed by our AI model to generate a helpful medical response tailored to your query.",
-        created_at: new Date().toISOString()
-      };
-      
-      dispatch(addMessage(aiMessage));
-    }, 1000);
   };
 
-  const createNewSession = () => {
-    const newSession = {
-      id: Date.now(),
-      created_at: new Date().toISOString(),
-      title: 'New consultation'
-    };
-    
-    dispatch(setSessions([newSession, ...sessions]));
-    dispatch(setCurrentSession(newSession));
-    dispatch(setMessages([]));
+  const handleCreateNewSession = () => {
+
   };
 
-  const switchSession = (sessionId) => {
-    const session = sessions.find(s => s.id === sessionId);
-    if (session) {
-      dispatch(setCurrentSession(session));
-      
-      // In a real app, you would fetch messages for this session from the API
-      // For now, let's simulate different messages for different sessions
-      const mockMessages = sessionId === 1 
-        ? [
-            {
-              id: 1,
-              session_id: 1,
-              sender: 'user',
-              content: 'I have been experiencing frequent headaches recently.',
-              created_at: '2025-03-12T10:30:15Z'
-            },
-            {
-              id: 2,
-              session_id: 1,
-              sender: 'assistant',
-              content: "I'm sorry to hear that you're experiencing frequent headaches. Can you tell me more about the nature of these headaches? For example, where is the pain located, how long do they last, and are there any triggers you've noticed?",
-              created_at: '2025-03-12T10:30:30Z'
-            },
-            {
-              id: 3,
-              session_id: 1,
-              sender: 'user',
-              content: 'They usually start at the front of my head and last for several hours. I notice they get worse when I stare at a screen for too long.',
-              created_at: '2025-03-12T10:31:00Z'
-            },
-            {
-              id: 4,
-              session_id: 1,
-              sender: 'assistant',
-              content: "Based on what you've described, it sounds like you might be experiencing tension headaches, which can be triggered by prolonged screen time. This is quite common, especially if you work at a computer. I would recommend taking regular breaks from screen time (try the 20-20-20 rule: every 20 minutes, look at something 20 feet away for 20 seconds), ensuring proper ergonomics at your workstation, and staying hydrated. Over-the-counter pain relievers like ibuprofen can help with symptoms. If the headaches persist or worsen, I would recommend seeing a healthcare provider for a more thorough evaluation.",
-              created_at: '2025-03-12T10:31:30Z'
-            }
-          ]
-        : [
-            {
-              id: 5,
-              session_id: 2,
-              sender: 'user',
-              content: 'I was prescribed Lisinopril for my blood pressure. Are there any side effects I should be aware of?',
-              created_at: '2025-03-10T14:45:15Z'
-            },
-            {
-              id: 6,
-              session_id: 2,
-              sender: 'assistant',
-              content: "Lisinopril is an ACE inhibitor commonly used to treat high blood pressure. Common side effects may include dizziness, lightheadedness, dry cough, and increased potassium levels. Less common but more serious side effects include swelling of the face/lips/tongue/throat, difficulty breathing, or signs of infection like fever or sore throat. It's important to take this medication regularly as prescribed, and if you experience any concerning side effects, especially severe dizziness or difficulty breathing, contact your healthcare provider immediately. Also, be sure to inform your doctor of all other medications you're taking, as some drugs can interact with Lisinopril.",
-              created_at: '2025-03-10T14:45:45Z'
-            },
-            {
-              id: 7,
-              session_id: 2,
-              sender: 'user',
-              content: 'I have been experiencing a dry cough since starting the medication. Is this normal?',
-              created_at: '2025-03-10T14:46:30Z'
-            },
-            {
-              id: 8,
-              session_id: 2,
-              sender: 'assistant',
-              content: "Yes, a persistent dry cough is one of the most common side effects of ACE inhibitors like Lisinopril, affecting about 5-35% of patients. This cough typically doesn't go away with cough medicines and may persist as long as you're taking the medication. If the cough is severely bothering you, speak with your doctor - they might consider switching you to a different type of blood pressure medication, such as an ARB (Angiotensin Receptor Blocker), which has similar benefits but is less likely to cause a cough. Don't stop taking your medication without consulting your healthcare provider first.",
-              created_at: '2025-03-10T14:47:00Z'
-            }
-          ];
-      
-      dispatch(setMessages(mockMessages));
-    }
+  const switchSession = (id) => {
+
   };
 
   const formatDate = (dateString) => {
@@ -280,7 +117,7 @@ export default function ChatInterface() {
             <SidebarContainer className="md:col-span-1">
               <div className="mb-4">
                 <NewChatButton
-                  onClick={createNewSession}
+                  onClick={handleCreateNewSession}
                   className="w-full"
                 >
                   New Chat
@@ -369,7 +206,7 @@ export default function ChatInterface() {
                 <div className="flex flex-col items-center justify-center h-full">
                   <p className="text-gray-500 mb-4">Select a conversation or start a new one</p>
                   <NewChatButton
-                    onClick={createNewSession}
+                    onClick={handleCreateNewSession}
                   >
                     New Chat
                   </NewChatButton>

@@ -3,18 +3,24 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { auth } from "../utils/firebase-config";
 import styled from 'styled-components';
+import { useSelector } from 'react-redux';
 
 export default function Sidebar({ isOpen, setIsOpen }) {
-  const [user, setUser] = useState(null);
+  const [tempUser, setTempUser] = useState();
+  const curUser = useSelector((state) => state.user.currentUser);
   const navigate = useNavigate();
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
+      setTempUser(curUser);
     });
 
     return () => unsubscribe(); // Cleanup subscription on unmount
   }, []);
+
+  useEffect(() => {
+    console.log(tempUser);
+  }, [tempUser]);
 
   const handleLogout = async () => {
     try {
@@ -80,15 +86,13 @@ export default function Sidebar({ isOpen, setIsOpen }) {
       </NavigationContainer>
 
       <ProfileSection>
-        {user ? (
+        {tempUser ? (
           <>
             <UserAvatarContainer isOpen={isOpen} onClick={() => {navigate('/profile')}}>
-              <UserAvatar>
-                {user.displayName ? user.displayName[0].toUpperCase() : user.email[0].toUpperCase()}
-              </UserAvatar>
+              {tempUser.profile_pic ? <ProfileImage src={tempUser.profile_pic} alt="Profile" /> : <UserAvatar>{tempUser.email[0].toUpperCase()}</UserAvatar>}
               <UserInfo isOpen={isOpen}>
-                <UserName>{user.displayName || user.email.split('@')[0]}</UserName>
-                <UserEmail>{user.email}</UserEmail>
+                <UserName>{tempUser && tempUser.name ? tempUser.name : "User"}</UserName>
+                <UserEmail>{tempUser && tempUser.email ? tempUser.email : "email@example.com"}</UserEmail>
               </UserInfo>
             </UserAvatarContainer>
             <ActionButton onClick={handleLogout}>
@@ -304,4 +308,13 @@ const LoginIcon = styled.svg`
   width: 20px;
   height: 20px;
   flex-shrink: 0;
+`;
+
+const ProfileImage = styled.img`
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 3px solid #fff;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
 `;

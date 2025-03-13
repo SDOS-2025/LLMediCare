@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useSelector, useDispatch } from "react-redux";
 import styled from "styled-components";
 import { FaPen, FaCheck, FaTrash, FaTimes, FaUser } from "react-icons/fa";
-import { updateExistingUser } from "../store/slices/user-slice.js";
+import { updateUserDetails } from "../store/slices/userSlice.js";
 import { getAuth, sendPasswordResetEmail, updateEmail } from "firebase/auth";
 import { auth } from "../utils/firebase-config.js";
 
@@ -18,7 +18,7 @@ export default function ProfilePage() {
     password: false,
   });
 
-//   const currentUser = useSelector((state) => state.user.selectedUser);
+  const currentUser = useSelector((state) => state.user.currentUser);
 
   // Temporary state to hold changes
   const [temp, setTemp] = useState(null);
@@ -27,17 +27,17 @@ export default function ProfilePage() {
     window.scrollTo(0, 0); // Scroll to the top of the page when the component is mounted
   }, []);
 
-//   useEffect(() => {
-//     setTemp(currentUser);
-//   }, [currentUser]);
+  useEffect(() => {
+    setTemp(currentUser);
+  }, [currentUser]);
 
   const handleEditToggle = (field) => {
     setIsEditable((prev) => ({ ...prev, [field]: !prev[field] }));
     if (isEditable[field] === false) {
-    //   setTemp((prev) => ({
-    //     ...prev,
-    //     [field]: currentUser[field],
-    //   }));
+      setTemp((prev) => ({
+        ...prev,
+        [field]: currentUser[field],
+      }));
     }
   };
 
@@ -49,37 +49,37 @@ export default function ProfilePage() {
       reader.addEventListener('load', () => {
         const imageBlob = reader.result;  // Get the base64 string
         console.log("Image Blob: ", imageBlob);  // Now it will show the correct value
-        // setTemp((prev) => ({
-        //   ...prev,
-        //   profile_pic: reader.result,
-        // }));
+        setTemp((prev) => ({
+          ...prev,
+          profile_pic: reader.result,
+        }));
       });
       reader.readAsDataURL(e.target.files[0]);
     }
   };
 
   const handleSaveChanges = async (field) => {
-    // dispatch(updateExistingUser({ email: currentUser.email, userData: temp }));
+    dispatch(updateUserDetails({ ...temp }));
     setIsEditable((prev) => ({ ...prev, [field]: false }));
   };
 
   const handleDiscardChanges = (field) => {
-    // setTemp((prev) => ({
-    //   ...prev,
-    //   [field]: currentUser[field],
-    // }));
+    setTemp((prev) => ({
+      ...prev,
+      [field]: currentUser[field],
+    }));
     setIsEditable((prev) => ({ ...prev, [field]: false }));
   };
 
   const handleCloseClick = () => {
-    // console.log(temp.profile_pic);
-    // dispatch(updateExistingUser({ email: currentUser.email, userData: temp })); // Dispatching action to update user data
+    console.log(temp.profile_pic);
+    dispatch(updateUserDetails({ ...temp })); // Dispatching action to update user data
     navigate("/home");
   };
 
   const handleResetPassword = async () => {
     try {
-    //   await sendPasswordResetEmail(auth, currentUser.email);
+      await sendPasswordResetEmail(auth, currentUser.email);
       alert("Password reset email sent! Check your inbox.");
     } catch (error) {
       alert(error.message);
@@ -92,7 +92,7 @@ export default function ProfilePage() {
       <Header>
         <h2>Your Profile</h2>
         <CloseBtn onClick={handleCloseClick}>
-          {/* <FaTimes /> */}
+          <FaTimes />
         </CloseBtn>
       </Header>
       
@@ -154,7 +154,7 @@ export default function ProfilePage() {
                 field: "password",
                 icon: "🔒",
               },
-            ].map(({ label, value, field, icon }) => (
+            ].map(({ label, value, setValue, field, icon }) => (
               <FormGroup key={field} isActive={isEditable[field]}>
                 <FormLabel>
                   <span className="icon">{icon}</span>
@@ -165,6 +165,7 @@ export default function ProfilePage() {
                   <FormInput
                     type={field === "password" ? "password" : "text"}
                     value={value}
+                    onChange={(e) => setValue(e.target.value)}
                     disabled={!isEditable[field]}
                   />
                   

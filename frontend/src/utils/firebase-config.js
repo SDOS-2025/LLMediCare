@@ -1,5 +1,9 @@
+// Import the functions you need from the SDKs you need
 import { initializeApp } from "firebase/app";
+import { getAnalytics } from "firebase/analytics";
 import { getAuth } from "firebase/auth";
+// TODO: Add SDKs for Firebase products that you want to use
+// https://firebase.google.com/docs/web/setup#available-libraries
 
 // Your web app's Firebase configuration
 // For Firebase JS SDK v7.20.0 and later, measurementId is optional
@@ -8,9 +12,9 @@ const firebaseConfig = {
   authDomain: "llmedicare-f27b0.firebaseapp.com",
   projectId: "llmedicare-f27b0",
   storageBucket: "llmedicare-f27b0.firebasestorage.app",
-  messagingSenderId: "265307308848",
-  appId: "1:265307308848:web:df3c5e9d7c670d05e8b629",
-  measurementId: "G-G6YN1HNE0H"
+  messagingSenderId: "213799874326",
+  appId: "1:213799874326:web:b732e49262e22943d4aa37",
+  measurementId: "G-XXVZHQHVV4"
 };
 
 // Initialize Firebase

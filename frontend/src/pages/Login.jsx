@@ -4,7 +4,7 @@ import { auth } from "../utils/firebase-config";
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from "firebase/auth";
 import { useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
-// import { createNewUser, fetchUserById } from "../store/user-store";
+import { createUser, fetchUserDetails } from "../store/slices/userSlice";
 
 export default function Login() {
   const [activeTab, setActiveTab] = useState("login");
@@ -26,7 +26,7 @@ export default function Login() {
     e.preventDefault();
     try {
       await signInWithEmailAndPassword(auth, email, password);
-      // await dispatch(fetchUserById(email)).unwrap();
+      await dispatch(fetchUserDetails(email)).unwrap();
 
       setMessage(`Welcome!`);
       navigate("/home");
@@ -52,8 +52,8 @@ export default function Login() {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       // const user = userCredential.user;
   
-      // const userData = { name, email, password };
-      // await dispatch(createNewUser(userData)).unwrap();
+      const userData = { name, email };
+      await dispatch(createUser(userData)).unwrap();
   
       setMessage("Registration successful! Go to the Login tab to login.");
       setActiveTab("login");
