@@ -6,10 +6,11 @@ import { Header } from '../components/Header';
 import Sidebar from '../components/Sidebar';
 import { Link } from 'react-router-dom';
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
+import axios from 'axios';
 
 export default function ChatInterface() {
   const dispatch = useDispatch();
-  const { sessions, currentSession, messages, loading, error } = useSelector((state) => state.chat);
+  const { sessions, currentSession, messages, loading } = useSelector((state) => state.chat);
   const user = useSelector((state) => state.auth.user);
   
   const [inputMessage, setInputMessage] = useState('');
@@ -17,6 +18,7 @@ export default function ChatInterface() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [authUser, setAuthUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
+  const [modelStatus, setModelStatus] = useState(null);
 
   const toggleSidebar = () => {
     setSidebarOpen(!sidebarOpen);
@@ -41,13 +43,64 @@ export default function ChatInterface() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+<<<<<<< HEAD
+=======
+  
+  useEffect(() => {
+    const fetchData = async () => {
+      if (!authUser) return;
+      
+      dispatch(setLoading(true));
+      try {
+        // Check model status first
+        try {
+          const modelStatusResponse = await axios.get('/api/ai-assistant/model/status/');
+          setModelStatus(modelStatusResponse.data);
+          console.log('Model status:', modelStatusResponse.data);
+          
+          if (modelStatusResponse.data.status === 'error') {
+            dispatch(setError(modelStatusResponse.data.message || 'AI model is not available'));
+            return;
+          }
+        } catch (err) {
+          console.error('Error checking model status:', err);
+          dispatch(setError('Unable to connect to AI model. Please try again later.'));
+          return;
+        }
+        
+        // Fetch chat sessions from the API
+        const sessionsResponse = await axios.get('/api/ai-assistant/chat-sessions/');
+        const sessions = sessionsResponse.data;
+        
+        dispatch(setSessions(sessions));
+        
+        // Set the current session to the most recent one if not already set
+        if (sessions.length > 0 && !currentSession) {
+          const recentSession = sessions[0];
+          dispatch(setCurrentSession(recentSession));
+          
+          // Fetch messages for this session
+          const messagesResponse = await axios.get(`/api/ai-assistant/chat-sessions/${recentSession.id}/messages/`);
+          dispatch(setMessages(messagesResponse.data));
+        }
+      } catch (err) {
+        console.error('Error fetching chat data:', err);
+        dispatch(setError('Failed to load chat data. Please try again.'));
+      } finally {
+        dispatch(setLoading(false));
+      }
+    };
+    
+    fetchData();
+  }, [dispatch, authUser, currentSession]);
+>>>>>>> 2f5a0d3d2c7973a9b46fed571ca9b54e83db5bce
 
-  const handleSendMessage = (e) => {
+  const handleSendMessage = async (e) => {
     e.preventDefault();
     
     if (!inputMessage.trim() || !currentSession) return;
     
-    // Add user message
+    // Add user message immediately for better UX
     const userMessage = {
       id: Date.now(),
       session_id: currentSession.id,
@@ -55,17 +108,122 @@ export default function ChatInterface() {
       message: inputMessage,
       created_at: new Date().toISOString()
     };
+<<<<<<< HEAD
     
     dispatch(sendUserInput(userMessage));
     setInputMessage('');
+=======
+    dispatch(addMessage(userMessage));
+    
+    // Show loading indicator for AI response
+    const loadingMessage = {
+      id: Date.now() + 1,
+      session_id: currentSession.id,
+      sender: 'assistant',
+      content: 'Thinking...',
+      created_at: new Date().toISOString(),
+      isLoading: true
+    };
+    dispatch(addMessage(loadingMessage));
+    
+    try {
+      // Check model status before sending message
+      const modelStatusResponse = await axios.get('/api/ai-assistant/model/status/');
+      if (modelStatusResponse.data.status === 'error') {
+        throw new Error(modelStatusResponse.data.message || 'AI model is not available');
+      }
+      
+      // Send message to backend with timeout
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+      
+      const response = await axios.post(
+        `/api/ai-assistant/chat-sessions/${currentSession.id}/messages/`,
+        { content: inputMessage },
+        { signal: controller.signal }
+      );
+      
+      clearTimeout(timeout);
+      
+      // Remove loading message
+      dispatch(setMessages(messages.filter(m => !m.isLoading)));
+      
+      // Add AI response to the chat
+      if (response.data && response.data.content) {
+        dispatch(addMessage({
+          id: response.data.id || Date.now() + 2,
+          session_id: currentSession.id,
+          sender: 'assistant',
+          content: response.data.content,
+          created_at: response.data.created_at || new Date().toISOString()
+        }));
+      } else {
+        throw new Error('Invalid response format from server');
+      }
+      
+      setInputMessage('');
+    } catch (error) {
+      console.error('Error sending message:', error);
+      // Remove loading message
+      dispatch(setMessages(messages.filter(m => !m.isLoading)));
+      
+      // Add error message to chat with more helpful information
+      let errorMessage = 'Sorry, I encountered an error processing your message. Please try again.';
+      
+      if (error.name === 'AbortError') {
+        errorMessage = 'The request took too long to process. Please try again.';
+      } else if (error.response) {
+        if (error.response.status === 500) {
+          errorMessage = 'The AI model is currently initializing. Please try again in a moment.';
+        } else if (error.response.status === 404) {
+          errorMessage = 'The chat service is unavailable. Please check your connection.';
+        } else if (error.response.data && error.response.data.detail) {
+          errorMessage = `Error: ${error.response.data.detail}`;
+        }
+      } else if (error.request) {
+        errorMessage = 'No response received from the server. Please check your connection.';
+      } else {
+        errorMessage = error.message || errorMessage;
+      }
+      
+      dispatch(addMessage({
+        id: Date.now() + 2,
+        session_id: currentSession.id,
+        sender: 'assistant',
+        content: errorMessage,
+        created_at: new Date().toISOString()
+      }));
+    }
+>>>>>>> 2f5a0d3d2c7973a9b46fed571ca9b54e83db5bce
   };
 
   const handleCreateNewSession = () => {
 
   };
 
+<<<<<<< HEAD
   const switchSession = (id) => {
 
+=======
+  const switchSession = async (sessionId) => {
+    const session = sessions.find(s => s.id === sessionId);
+    if (session) {
+      dispatch(setCurrentSession(session));
+      dispatch(setLoading(true));
+      
+      try {
+        // Fetch messages for the selected session from the API
+        const response = await axios.get(`/api/ai-assistant/chat-sessions/${sessionId}/messages/`);
+        dispatch(setMessages(response.data));
+      } catch (error) {
+        console.error('Error fetching messages:', error);
+        dispatch(setError('Failed to load messages. Please try again.'));
+        dispatch(setMessages([])); // Clear messages on error
+      } finally {
+        dispatch(setLoading(false));
+      }
+    }
+>>>>>>> 2f5a0d3d2c7973a9b46fed571ca9b54e83db5bce
   };
 
   const formatDate = (dateString) => {
