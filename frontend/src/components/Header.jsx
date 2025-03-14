@@ -2,7 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import styled from 'styled-components';
 
-export const Header = ({ toggleSidebar, sidebarOpen }) => {
+export default function Header ({ toggleSidebar, sidebarOpen }) {
   return (
     <HeaderContainer>
       <NavContainer>

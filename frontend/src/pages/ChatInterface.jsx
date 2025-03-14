@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import styled from 'styled-components';
-import { Header } from '../components/Header';
+import Header from '../components/Header';
 import Sidebar from '../components/Sidebar';
 import { Link } from 'react-router-dom';
 import { onAuthStateChanged } from 'firebase/auth';
