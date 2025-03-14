@@ -66,6 +66,21 @@ class SessionViewSet(viewsets.ModelViewSet):
             session = serializer.save(user_email=user)
             return Response(SessionSerializer(session).data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    @action(detail=True, methods=['post'])
+    def add_chat(self, request, pk=None):
+        """Add a chat message to session_chats"""
+        session = self.get_object()
+        message = request.data.get("message")
+
+        if not message:
+            return Response({"error": "Message is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Append the chat to session_chats
+        session.session_chats.append(message)
+        session.save(update_fields=["session_chats"])
+
+        return Response(SessionSerializer(session).data, status=status.HTTP_200_OK)
 
     def update(self, request, *args, **kwargs):
         """Update an existing Session (PATCH for partial updates)"""
