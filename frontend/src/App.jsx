@@ -6,7 +6,7 @@ import Home from './pages/Home';
 import ChatInterface from './pages/ChatInterface.jsx';
 // import Appointments from './pages/Appointments.jsx';
 import Appointments from './pages/Appointments2.jsx';
-import Records from './pages/Records.jsx';
+import Records from './components/Records.jsx';
 import Login  from './pages/Login.jsx';
 import Profile from './pages/Profile.jsx';
 import { auth } from './utils/firebase-config.js';
