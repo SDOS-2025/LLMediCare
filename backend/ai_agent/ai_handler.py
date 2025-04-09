@@ -3,6 +3,8 @@ import torch
 import logging
 from typing import Dict, List
 import asyncio
+import os
+import pickle
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -20,9 +22,33 @@ class EnhancedAIAgent:
         # Initialize conversation memory
         self.conversation_history = []
         self.max_history = 5
+        self.history_file = os.path.join(os.path.dirname(__file__), "agent_history.pkl")
+        
+        # Load any existing history
+        self._load_history()
         
         # Initialize medical knowledge base
         self._initialize_medical_knowledge()
+
+    def _load_history(self):
+        """Load conversation history from file"""
+        try:
+            if os.path.exists(self.history_file):
+                with open(self.history_file, 'rb') as f:
+                    self.conversation_history = pickle.load(f)
+                    logger.info(f"Loaded {len(self.conversation_history)} agent history items")
+        except Exception as e:
+            logger.error(f"Error loading agent history: {e}")
+            self.conversation_history = []
+
+    def _save_history(self):
+        """Save conversation history to file"""
+        try:
+            with open(self.history_file, 'wb') as f:
+                pickle.dump(self.conversation_history, f)
+                logger.info(f"Saved {len(self.conversation_history)} agent history items")
+        except Exception as e:
+            logger.error(f"Error saving agent history: {e}")
 
     def _initialize_medical_knowledge(self):
         """Initialize the medical knowledge base with structured medical information"""
@@ -215,6 +241,9 @@ class EnhancedAIAgent:
             if len(self.conversation_history) > self.max_history:
                 self.conversation_history.pop(0)
             
+            # Save history to disk
+            self._save_history()
+            
             return response
             
         except Exception as e:
@@ -233,4 +262,11 @@ class EnhancedAIAgent:
         """Clear conversation memory"""
         logger.info("Clearing AI agent memory")
         self.conversation_history = []
+        # Clean up the history file
+        if os.path.exists(self.history_file):
+            try:
+                os.remove(self.history_file)
+                logger.info("Removed agent history file")
+            except Exception as e:
+                logger.error(f"Error removing agent history file: {e}")
         return True

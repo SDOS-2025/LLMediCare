@@ -56,25 +56,106 @@ class SessionViewSet(viewsets.ModelViewSet):
 
     def create(self, request, *args, **kwargs):
         """Create a new Session for a user identified by email"""
-        user_email = request.data.get("user_email")
-        # Ensure user exists
-        user = get_object_or_404(User, email=user_email)
-        serializer = self.get_serializer(data=request.data)
-        if serializer.is_valid():
-            session = serializer.save(user_email=user)
-            return Response(SessionSerializer(session).data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            print(f"Request data: {request.data}")
+            user_email = request.data.get("user_email")
+            
+            if not user_email:
+                print("No user_email provided in request data")
+                return Response({"error": "User email is required"}, status=status.HTTP_400_BAD_REQUEST)
+                
+            print(f"Creating session for user email: {user_email}")
+                
+            # Ensure user exists or create a new one
+            try:
+                user = User.objects.get(email=user_email)
+                print(f"Found existing user: {user.id} - {user.email}")
+            except User.DoesNotExist:
+                # Create a basic user if not exists
+                print(f"User not found, creating new user with email: {user_email}")
+                user = User.objects.create(
+                    name=user_email.split('@')[0],  # Simple name from email
+                    email=user_email
+                )
+                print(f"Created new user: {user.id} - {user.email}")
+                
+            # Create a new empty session for this user
+            session = Session.objects.create(
+                user_email=user,
+                session_chats=[]
+            )
+            
+            print(f"Created new session: {session.id} for user: {user.email}")
+            
+            # Prepare response data
+            response_data = SessionSerializer(session).data
+            print(f"Returning session data: {response_data}")
+            
+            return Response(response_data, status=status.HTTP_201_CREATED)
+        except Exception as e:
+            print(f"Error creating session: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     
     @action(detail=True, methods=['post'])
     def add_chat(self, request, pk=None):
         """Add a chat message to session_chats"""
-        session = self.get_object()
-        message = request.data.get("message")
-        if not message:
-            return Response({"error": "Message is required"}, status=status.HTTP_400_BAD_REQUEST)
-        session.session_chats.append(message)
-        session.save(update_fields=["session_chats"])
-        return Response(SessionSerializer(session).data, status=status.HTTP_200_OK)
+        try:
+            print(f"Add chat request for session {pk} with data: {request.data}")
+            session = self.get_object()
+            print(f"Found session: {session.id}")
+            
+            message = request.data.get("message")
+            
+            if not message:
+                print("No message provided in request data")
+                return Response({"error": "Message is required"}, status=status.HTTP_400_BAD_REQUEST)
+            
+            print(f"Message to add: {message}")
+            
+            # Initialize session_chats if it's None
+            if session.session_chats is None:
+                print("Initializing empty session_chats")
+                session.session_chats = []
+            
+            # Add the message to session_chats
+            session.session_chats.append(message)
+            print(f"Updated session_chats, now contains {len(session.session_chats)} messages")
+            
+            # Save the session
+            session.save(update_fields=["session_chats"])
+            print("Session saved successfully")
+            
+            # Prepare response data
+            response_data = SessionSerializer(session).data
+            
+            return Response(response_data, status=status.HTTP_200_OK)
+        except Exception as e:
+            print(f"Error adding chat message: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            return Response(
+                {"error": f"Failed to add chat message: {str(e)}"}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    @action(detail=True, methods=['delete'])
+    def clear_chats(self, request, pk=None):
+        """Clear all chat messages from a session"""
+        try:
+            session = self.get_object()
+            session.session_chats = []
+            session.save(update_fields=["session_chats"])
+            return Response(
+                {"message": "Chat history cleared successfully", "session_chats": []}, 
+                status=status.HTTP_200_OK
+            )
+        except Exception as e:
+            return Response(
+                {"error": f"Failed to clear chats: {str(e)}"}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
     def update(self, request, *args, **kwargs):
         """Update an existing Session (PATCH for partial updates)"""
@@ -94,12 +175,42 @@ class SessionViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'])
     def user_sessions(self, request):
         """Get all sessions for a specific user (by email)"""
-        user_email = request.query_params.get("email")
-        if not user_email:
-            return Response({"error": "User email is required"}, status=status.HTTP_400_BAD_REQUEST)
-        user = get_object_or_404(User, email=user_email)
-        sessions = Session.objects.filter(user_email=user)
-        return Response(SessionSerializer(sessions, many=True).data)
+        try:
+            print(f"user_sessions called with query params: {request.query_params}")
+            user_email = request.query_params.get("email")
+            
+            if not user_email:
+                print("No email parameter provided")
+                return Response({"error": "User email is required"}, status=status.HTTP_400_BAD_REQUEST)
+            
+            print(f"Looking for sessions for user email: {user_email}")
+                
+            # Find the user
+            try:
+                user = User.objects.get(email=user_email)
+                print(f"Found user: {user.id} - {user.email}")
+            except User.DoesNotExist:
+                print(f"No user found with email: {user_email}")
+                # Return empty list if user doesn't exist
+                return Response([])
+                
+            # Get all sessions for this user, ordered by most recent first
+            sessions = Session.objects.filter(user_email=user).order_by('-created_at')
+            print(f"Found {sessions.count()} sessions")
+            
+            # Serialize the sessions
+            serialized_sessions = SessionSerializer(sessions, many=True).data
+            print(f"Returning {len(serialized_sessions)} serialized sessions")
+            
+            return Response(serialized_sessions)
+        except Exception as e:
+            print(f"Error fetching user sessions: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            return Response(
+                {"error": f"Failed to fetch user sessions: {str(e)}"}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
 
 @api_view(['GET'])

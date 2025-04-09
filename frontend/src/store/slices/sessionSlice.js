@@ -5,21 +5,77 @@ import axios from "axios";
 const API_BASE1 = "http://localhost:8000/api/ai";
 const API_BASE2 = "http://localhost:8000/api/user";
 
+// Configure axios defaults
+axios.defaults.withCredentials = true;
+axios.defaults.timeout = 30000; // 30 seconds timeout
+
+// Add request interceptor for better error tracking
+axios.interceptors.request.use(
+  (config) => {
+    console.log(
+      `Making ${config.method.toUpperCase()} request to ${config.url}`
+    );
+    return config;
+  },
+  (error) => {
+    console.error("Request error:", error);
+    return Promise.reject(error);
+  }
+);
+
+// Add response interceptor for better error tracking
+axios.interceptors.response.use(
+  (response) => {
+    console.log(
+      `Response from ${response.config.url} with status ${response.status}`
+    );
+    return response;
+  },
+  (error) => {
+    if (error.response) {
+      console.error(
+        `Response error ${error.response.status} from ${error.config?.url}:`,
+        error.response.data
+      );
+    } else if (error.request) {
+      console.error(
+        `No response received for request to ${error.config?.url}:`,
+        error.request
+      );
+    } else {
+      console.error("Request setup error:", error.message);
+    }
+    return Promise.reject(error);
+  }
+);
+
 export const sendUserInput = createAsyncThunk(
   "session/sendUserInput",
   async (inputText, { dispatch, rejectWithValue }) => {
     try {
+      console.log("sendUserInput called with:", inputText);
+
       if (!inputText.session_id) {
+        console.error("Session ID is missing in inputText:", inputText);
         throw new Error("Session ID is required");
       }
 
       // First add the user's message to the session
-      await dispatch(addChatToSession({ ...inputText }));
+      try {
+        console.log("Adding user message to session:", inputText);
+        await dispatch(addChatToSession({ ...inputText })).unwrap();
+      } catch (error) {
+        console.error("Error adding user message to session:", error);
+        // Continue even if this fails to try to get an AI response
+      }
 
       // Then get the AI response
+      console.log("Calling AI endpoint with query:", inputText.message);
       const response = await axios.post(`${API_BASE1}/chat/`, {
         query: inputText.message,
       });
+
+      console.log("Got AI response:", response.data);
 
       // Create the AI's response message
       const llmMessage = {
@@ -31,7 +87,13 @@ export const sendUserInput = createAsyncThunk(
       };
 
       // Add the AI's response to the session
-      await dispatch(addChatToSession({ ...llmMessage }));
+      try {
+        console.log("Adding AI response to session:", llmMessage);
+        await dispatch(addChatToSession({ ...llmMessage })).unwrap();
+      } catch (error) {
+        console.error("Error adding AI response to session:", error);
+        // Continue to return the response even if saving to session fails
+      }
 
       // Return the formatted message for the UI
       return {
@@ -40,11 +102,13 @@ export const sendUserInput = createAsyncThunk(
       };
     } catch (error) {
       console.error("Error in sendUserInput:", error);
-      return rejectWithValue(
+      const errorMessage =
+        error.response?.data?.message ||
+        error.response?.data?.error ||
         error.response?.data ||
-          error.message ||
-          "Failed to get response from the model"
-      );
+        error.message ||
+        "Failed to get response from the model";
+      return rejectWithValue(errorMessage);
     }
   }
 );
@@ -54,19 +118,40 @@ export const createNewSession = createAsyncThunk(
   "session/createNewSession",
   async (userData, { dispatch, rejectWithValue }) => {
     try {
-      if (!userData || !userData.email) {
-        throw new Error("User email is required to create a session");
+      console.log("Creating new session for user:", userData);
+
+      // Extract email from user object
+      let userEmail;
+      if (typeof userData === "string") {
+        userEmail = userData;
+      } else if (userData && userData.email) {
+        userEmail = userData.email;
+      } else if (userData && userData.user && userData.user.email) {
+        // Some user objects are nested
+        userEmail = userData.user.email;
+      } else {
+        console.error("Invalid user data format:", userData);
+        throw new Error("Valid user email is required to create a session");
       }
 
+      console.log("Using email:", userEmail);
+
       const response = await axios.post(`${API_BASE2}/sessions/`, {
-        user_email: userData.email,
+        user_email: userEmail,
       });
 
+      console.log("Session created successfully:", response.data);
+
       // After creating the session, fetch all user sessions
-      await dispatch(getUserSessions(userData.email));
+      await dispatch(getUserSessions(userEmail));
 
       return response.data;
     } catch (error) {
+      console.error("Error creating session:", error);
+      if (error.response) {
+        console.error("Response status:", error.response.status);
+        console.error("Response data:", error.response.data);
+      }
       return rejectWithValue(
         error.response?.data || error.message || "Failed to create session"
       );
@@ -79,15 +164,34 @@ export const getUserSessions = createAsyncThunk(
   "session/getUserSessions",
   async (userEmail, { rejectWithValue }) => {
     try {
-      if (!userEmail) {
+      // Extract email if it's an object
+      let email = userEmail;
+      if (typeof userEmail === "object") {
+        if (userEmail.email) {
+          email = userEmail.email;
+        } else if (userEmail.user && userEmail.user.email) {
+          email = userEmail.user.email;
+        } else {
+          console.error("Invalid user email format:", userEmail);
+          throw new Error("User email is required to fetch sessions");
+        }
+      }
+
+      if (!email) {
+        console.error("Missing email in:", userEmail);
         throw new Error("User email is required to fetch sessions");
       }
 
-      const response = await axios.get(
-        `${API_BASE2}/sessions/?email=${userEmail}`
-      );
+      console.log(`Fetching sessions for user email: ${email}`);
+      const response = await axios.get(`${API_BASE2}/sessions/?email=${email}`);
+      console.log("Got user sessions:", response.data);
       return response.data;
     } catch (error) {
+      console.error("Error fetching user sessions:", error);
+      if (error.response) {
+        console.error("Response status:", error.response.status);
+        console.error("Response data:", error.response.data);
+      }
       return rejectWithValue(
         error.response?.data || error.message || "Failed to fetch user sessions"
       );
@@ -99,7 +203,10 @@ export const addChatToSession = createAsyncThunk(
   "session/addChatToSession",
   async (inputMessage, { rejectWithValue }) => {
     try {
+      console.log("addChatToSession called with:", inputMessage);
+
       if (!inputMessage || !inputMessage.session_id) {
+        console.error("Missing session_id in message:", inputMessage);
         throw new Error("Session ID is required to add chat");
       }
 
@@ -110,15 +217,41 @@ export const addChatToSession = createAsyncThunk(
         created_at: inputMessage.created_at,
       };
 
-      const response = await axios.post(
-        `${API_BASE2}/sessions/${inputMessage.session_id}/add_chat/`,
-        { message: message }
+      console.log("Formatted message:", message);
+      console.log(
+        `Sending to ${API_BASE2}/sessions/${inputMessage.session_id}/add_chat/`
       );
-      return response.data;
+
+      try {
+        const response = await axios.post(
+          `${API_BASE2}/sessions/${inputMessage.session_id}/add_chat/`,
+          { message: message },
+          {
+            headers: {
+              "Content-Type": "application/json",
+              Accept: "application/json",
+            },
+          }
+        );
+        console.log("Add chat response:", response.data);
+        return response.data;
+      } catch (error) {
+        console.error("API error in addChatToSession:", error);
+        if (error.response) {
+          console.error("Response status:", error.response.status);
+          console.error("Response data:", error.response.data);
+        }
+        throw error;
+      }
     } catch (error) {
-      return rejectWithValue(
-        error.response?.data || error.message || "Failed to add chat to session"
-      );
+      console.error("Error in addChatToSession:", error);
+      const errorMessage =
+        error.response?.data?.message ||
+        error.response?.data?.error ||
+        error.response?.data ||
+        error.message ||
+        "Failed to add chat to session";
+      return rejectWithValue(errorMessage);
     }
   }
 );
@@ -138,9 +271,10 @@ export const deleteSession = createAsyncThunk(
   }
 );
 
+// Make sure the state contains the right properties
 const initialState = {
   currentSession: null,
-  sessions: [],
+  sessions: [], // All user sessions
   messages: [],
   loading: false,
   error: null,
@@ -166,6 +300,29 @@ const saveChatHistory = (userId, messages) => {
     localStorage.setItem(getUserStorageKey(userId), JSON.stringify(messages));
   } catch (error) {
     console.error("Error saving chat history:", error);
+  }
+};
+
+// Helper function to save session in localStorage
+const saveUserSessions = (userEmail, sessions) => {
+  try {
+    localStorage.setItem(
+      `user_sessions_${userEmail}`,
+      JSON.stringify(sessions)
+    );
+  } catch (error) {
+    console.error("Error saving user sessions:", error);
+  }
+};
+
+// Helper function to load sessions from localStorage
+const loadUserSessions = (userEmail) => {
+  try {
+    const stored = localStorage.getItem(`user_sessions_${userEmail}`);
+    return stored ? JSON.parse(stored) : [];
+  } catch (error) {
+    console.error("Error loading user sessions:", error);
+    return [];
   }
 };
 
@@ -224,17 +381,74 @@ export const sessionSlice = createSlice({
       })
 
       // Create new session
+      .addCase(createNewSession.pending, (state) => {
+        state.loading = true;
+      })
       .addCase(createNewSession.fulfilled, (state, action) => {
+        state.loading = false;
         state.currentSession = action.payload;
+        // Don't reset all messages here to preserve history
+
+        // If this session doesn't already exist in our sessions array
+        const sessionExists = state.sessions.some(
+          (session) => session.id === action.payload.id
+        );
+
+        if (!sessionExists) {
+          // Add the new session to the sessions array
+          state.sessions = [action.payload, ...state.sessions];
+
+          // Save updated sessions to localStorage if we have user email
+          if (action.payload.user_email) {
+            saveUserSessions(action.payload.user_email, state.sessions);
+          }
+        }
+      })
+      .addCase(createNewSession.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
       })
 
       // Get all sessions for user
+      .addCase(getUserSessions.pending, (state) => {
+        state.loading = true;
+      })
       .addCase(getUserSessions.fulfilled, (state, action) => {
-        state.sessions = action.payload;
+        state.loading = false;
+        state.sessions = action.payload || [];
+
+        // Save the sessions to localStorage for offline access
+        if (
+          action.payload &&
+          action.payload.length > 0 &&
+          action.payload[0].user_email
+        ) {
+          saveUserSessions(action.payload[0].user_email, action.payload);
+        }
+
+        // If we have sessions but no current session, set the most recent as current
+        if (state.sessions.length > 0 && !state.currentSession) {
+          state.currentSession = state.sessions[0];
+        }
+      })
+      .addCase(getUserSessions.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
       })
 
       .addCase(addChatToSession.fulfilled, (state, action) => {
+        if (!action.payload) return;
+
         state.currentSession.session_chats = action.payload.session_chats;
+
+        // Also update this session in the sessions array
+        const sessionIndex = state.sessions.findIndex(
+          (session) => session.id === action.payload.id
+        );
+
+        if (sessionIndex !== -1) {
+          state.sessions[sessionIndex] = action.payload;
+        }
       })
 
       // Delete a session
@@ -242,10 +456,25 @@ export const sessionSlice = createSlice({
         state.sessions = state.sessions.filter(
           (session) => session.id !== action.payload
         );
+
+        // If the deleted session was the current session, set a new current session
+        if (
+          state.currentSession &&
+          state.currentSession.id === action.payload
+        ) {
+          state.currentSession =
+            state.sessions.length > 0 ? state.sessions[0] : null;
+        }
       });
   },
 });
 
-export const { setInput, clearSession, setCurrentSession } =
-  sessionSlice.actions;
+export const {
+  setInput,
+  clearSession,
+  setCurrentSession,
+  addMessage,
+  clearMessages,
+} = sessionSlice.actions;
+
 export default sessionSlice.reducer;

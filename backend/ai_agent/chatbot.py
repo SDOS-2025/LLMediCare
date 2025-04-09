@@ -5,6 +5,8 @@ import logging
 from .ai_handler import EnhancedAIAgent
 import os
 from pathlib import Path
+import pickle
+import traceback
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -17,6 +19,10 @@ class MedicalChatbot:
         self.ai_agent = EnhancedAIAgent()
         self.conversation_history = []
         self.max_history = 10
+        self.history_file = os.path.join(os.path.dirname(__file__), "conversation_history.pkl")
+        
+        # Load any existing history
+        self._load_history()
         
         # Initialize Gemma model
         self._initialize_gemma()
@@ -42,6 +48,44 @@ class MedicalChatbot:
         except Exception as e:
             logger.error(f"Error initializing Gemma model: {e}")
             raise
+
+    def _load_history(self):
+        """Load conversation history from file"""
+        try:
+            if os.path.exists(self.history_file):
+                try:
+                    with open(self.history_file, 'rb') as f:
+                        self.conversation_history = pickle.load(f)
+                        logger.info(f"Loaded {len(self.conversation_history)} conversation history items")
+                except (pickle.PickleError, EOFError) as e:
+                    logger.error(f"Pickle error loading conversation history: {e}")
+                    # File might be corrupted, create a new one
+                    os.remove(self.history_file)
+                    self.conversation_history = []
+            else:
+                # Create the directory if it doesn't exist
+                os.makedirs(os.path.dirname(self.history_file), exist_ok=True)
+                self.conversation_history = []
+        except Exception as e:
+            logger.error(f"Error loading conversation history: {e}")
+            logger.error(traceback.format_exc())
+            self.conversation_history = []
+
+    def _save_history(self):
+        """Save conversation history to file"""
+        try:
+            # Create the directory if it doesn't exist
+            os.makedirs(os.path.dirname(self.history_file), exist_ok=True)
+            
+            # Save the history
+            with open(self.history_file, 'wb') as f:
+                pickle.dump(self.conversation_history, f)
+                logger.info(f"Saved {len(self.conversation_history)} conversation history items")
+            return True
+        except Exception as e:
+            logger.error(f"Error saving conversation history: {e}")
+            logger.error(traceback.format_exc())
+            return False
 
     def _format_response(self, text):
         """Format the response with proper markdown-style formatting"""
@@ -231,6 +275,11 @@ Please provide your response following this exact format."""
                 if len(self.conversation_history) > self.max_history:
                     self.conversation_history.pop(0)
                 
+                # Save history to persistent storage
+                history_saved = self._save_history()
+                if not history_saved:
+                    logger.warning("Failed to save conversation history")
+                
                 return formatted_response
             else:
                 logger.error(f"Error from Ollama API: {response.status_code}")
@@ -257,4 +306,14 @@ Please provide your response following this exact format."""
         """Clear the conversation history"""
         logger.info("Clearing chatbot conversation history")
         self.conversation_history = []
+        # Make sure the AI agent's memory is also cleared
+        self.ai_agent.clear_memory()
+        # Clear the saved history file
+        if os.path.exists(self.history_file):
+            try:
+                os.remove(self.history_file)
+                logger.info("Removed history file")
+            except Exception as e:
+                logger.error(f"Error removing history file: {e}")
+                logger.error(traceback.format_exc())
         return True 
