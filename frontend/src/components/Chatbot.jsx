@@ -22,69 +22,79 @@ import SmartToyIcon from "@mui/icons-material/SmartToy";
 import PersonIcon from "@mui/icons-material/Person";
 import AddIcon from "@mui/icons-material/Add";
 import { styled } from "@mui/material/styles";
+import { useDispatch, useSelector } from "react-redux";
+import { sendUserInput, createNewSession } from "../store/slices/sessionSlice";
 
 // Styled components
 const ChatContainer = styled(Paper)(({ theme }) => ({
   height: "calc(100vh - 200px)",
   display: "flex",
   flexDirection: "column",
-  backgroundColor: "#f8f9fa",
-  borderRadius: "16px",
+  backgroundColor: "#ffffff",
+  borderRadius: "24px",
   overflow: "hidden",
-  boxShadow: "0 4px 20px rgba(0, 0, 0, 0.1)",
+  boxShadow: "0 8px 32px rgba(0, 0, 0, 0.08)",
+  border: "1px solid rgba(0, 0, 0, 0.05)",
+  transition: "all 0.3s ease",
+  "&:hover": {
+    boxShadow: "0 12px 40px rgba(0, 0, 0, 0.12)",
+  },
 }));
 
 const MessagesContainer = styled(Box)(({ theme }) => ({
   flex: 1,
   overflowY: "auto",
-  padding: theme.spacing(2),
+  padding: theme.spacing(3),
+  background: "linear-gradient(180deg, #f8f9fa 0%, #ffffff 100%)",
   "&::-webkit-scrollbar": {
-    width: "8px",
+    width: "6px",
   },
   "&::-webkit-scrollbar-track": {
-    background: "#f1f1f1",
+    background: "transparent",
   },
   "&::-webkit-scrollbar-thumb": {
-    background: "#888",
-    borderRadius: "4px",
+    background: "#cbd5e1",
+    borderRadius: "12px",
+    "&:hover": {
+      background: "#94a3b8",
+    },
   },
 }));
 
 const MessageBubble = styled(Box)(({ theme, isUser }) => ({
   maxWidth: "80%",
-  margin: "8px 0",
-  padding: "16px 20px",
-  borderRadius: isUser ? "18px 18px 4px 18px" : "18px 18px 18px 4px",
-  backgroundColor: isUser ? theme.palette.primary.main : "#fff",
+  margin: "12px 0",
+  padding: "16px 24px",
+  borderRadius: isUser ? "20px 20px 4px 20px" : "20px 20px 20px 4px",
+  backgroundColor: isUser ? theme.palette.primary.main : "#f8fafc",
   color: isUser ? "#fff" : theme.palette.text.primary,
   alignSelf: isUser ? "flex-end" : "flex-start",
-  boxShadow: "0 2px 5px rgba(0,0,0,0.1)",
+  boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
   width: "fit-content",
-  "& ul": {
-    margin: "8px 0",
-    paddingLeft: "0",
-    listStyleType: "none",
+  transition: "transform 0.2s ease",
+  "&:hover": {
+    transform: "translateY(-1px)",
   },
-  "& li": {
-    marginBottom: "12px",
-    fontSize: "0.95rem",
-    lineHeight: "1.6",
-    position: "relative",
-    paddingLeft: "20px",
+  "& .MuiList-root": {
+    padding: 0,
+    marginTop: "8px",
+    marginBottom: "8px",
+  },
+  "& .MuiListItem-root": {
+    display: "flex",
+    alignItems: "flex-start",
+    padding: "4px 0",
     "&::before": {
-      content: '""',
-      position: "absolute",
-      left: "0",
-      top: "8px",
-      width: "6px",
-      height: "6px",
-      backgroundColor: isUser ? "#fff" : theme.palette.primary.main,
-      borderRadius: "50%",
+      content: '"•"',
+      color: isUser ? "#fff" : theme.palette.primary.main,
+      marginRight: "12px",
+      fontSize: "1.2rem",
+      lineHeight: 1.5,
     },
   },
-  "& h6": {
+  "& .MuiTypography-h6": {
     fontWeight: 600,
-    marginBottom: "16px",
+    marginBottom: "12px",
     color: isUser ? "#fff" : theme.palette.primary.main,
     fontSize: "1.1rem",
     borderBottom: `1px solid ${
@@ -97,9 +107,20 @@ const MessageBubble = styled(Box)(({ theme, isUser }) => ({
 const InputContainer = styled(Box)(({ theme }) => ({
   display: "flex",
   padding: theme.spacing(2),
-  backgroundColor: "#fff",
-  borderTop: "1px solid #e0e0e0",
+  backgroundColor: "#ffffff",
+  borderTop: "1px solid rgba(0,0,0,0.06)",
   gap: theme.spacing(1),
+  position: "relative",
+  "&::before": {
+    content: '""',
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: "1px",
+    background:
+      "linear-gradient(90deg, transparent, rgba(0,0,0,0.05), transparent)",
+  },
 }));
 
 const formatResponse = (text) => {
@@ -115,19 +136,7 @@ const formatResponse = (text) => {
         if (index % 2 === 0) {
           // This is a section header
           return (
-            <Typography
-              key={index}
-              variant="h6"
-              sx={{
-                mt: index === 0 ? 0 : 2,
-                mb: 1,
-                color: "primary.main",
-                fontWeight: 600,
-                fontSize: "1.1rem",
-                borderBottom: "1px solid rgba(25, 118, 210, 0.2)",
-                paddingBottom: "8px",
-              }}
-            >
+            <Typography key={index} variant="h6" gutterBottom>
               {section.trim()}
             </Typography>
           );
@@ -139,36 +148,27 @@ const formatResponse = (text) => {
             .filter((line) => line);
 
           return (
-            <Box key={index} sx={{ mb: 2 }}>
-              <List
-                sx={{
-                  listStyleType: "disc",
-                  pl: 2,
-                  "& .MuiListItem-root": {
-                    display: "list-item",
-                    pl: 0.5,
-                    py: 0.5,
-                  },
-                }}
-              >
-                {lines.map((line, i) => {
-                  // Remove any existing bullet points or dashes
-                  const cleanLine = line.replace(/^[-•*]\s*/, "").trim();
-                  return (
-                    <ListItem
-                      key={i}
+            <List key={index} dense>
+              {lines.map((line, i) => {
+                // Remove any existing bullet points or dashes
+                const cleanLine = line.replace(/^[-•*]\s*/, "").trim();
+                return (
+                  <ListItem key={i}>
+                    <Typography
+                      variant="body1"
                       sx={{
-                        color: "text.primary",
                         fontSize: "0.95rem",
                         lineHeight: 1.6,
+                        display: "block",
+                        width: "100%",
                       }}
                     >
-                      <Typography variant="body1">{cleanLine}</Typography>
-                    </ListItem>
-                  );
-                })}
-              </List>
-            </Box>
+                      {cleanLine}
+                    </Typography>
+                  </ListItem>
+                );
+              })}
+            </List>
           );
         }
       })}
@@ -177,6 +177,11 @@ const formatResponse = (text) => {
 };
 
 const Chatbot = () => {
+  const dispatch = useDispatch();
+  const currentUser = useSelector((state) => state.user.currentUser);
+  const currentSession = useSelector((state) => state.session.cur_session);
+  const loading = useSelector((state) => state.session.loading);
+
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -195,6 +200,32 @@ const Chatbot = () => {
     scrollToBottom();
   }, [messages]);
 
+  // Initialize messages from current session if available
+  useEffect(() => {
+    if (
+      currentSession &&
+      currentSession.session_chats &&
+      currentSession.session_chats.length > 0
+    ) {
+      const formattedMessages = currentSession.session_chats.map((chat) => ({
+        text: chat.message || chat.content,
+        isUser: chat.sender === "user",
+      }));
+      setMessages(formattedMessages);
+    }
+  }, [currentSession]);
+
+  // Update loading state based on Redux loading state
+  useEffect(() => {
+    setIsLoading(loading);
+  }, [loading]);
+
+  // Add a debug log to see what's happening with the response
+  useEffect(() => {
+    console.log("Current session:", currentSession);
+    console.log("Current messages:", messages);
+  }, [currentSession, messages]);
+
   const handleSend = async () => {
     if (!input.trim()) return;
 
@@ -204,20 +235,57 @@ const Chatbot = () => {
     setIsLoading(true);
 
     try {
-      const response = await fetch("http://localhost:8000/api/ai/chat/", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ query: userMessage }),
-      });
+      let sessionId = currentSession?.id;
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+      // If no current session exists, create a new one
+      if (!sessionId && currentUser) {
+        try {
+          const newSession = await dispatch(
+            createNewSession(currentUser)
+          ).unwrap();
+          sessionId = newSession.id;
+          console.log("Created new session with ID:", sessionId);
+        } catch (error) {
+          console.error("Error creating session:", error);
+          setSnackbar({
+            open: true,
+            message: "Failed to create a new chat session. Please try again.",
+            severity: "error",
+          });
+          setIsLoading(false);
+          return;
+        }
       }
 
-      const data = await response.json();
-      setMessages((prev) => [...prev, { text: data.response, isUser: false }]);
+      if (!sessionId) {
+        console.error("No session ID available");
+        setSnackbar({
+          open: true,
+          message: "Unable to send message. Please try again.",
+          severity: "error",
+        });
+        setIsLoading(false);
+        return;
+      }
+
+      const messageData = {
+        id: Date.now(),
+        session_id: sessionId,
+        sender: "user",
+        message: userMessage,
+        created_at: new Date().toISOString(),
+      };
+
+      console.log("Sending message with data:", messageData);
+
+      // Send user message and get the response
+      const result = await dispatch(sendUserInput(messageData)).unwrap();
+      console.log("Message sent successfully:", result);
+
+      // Directly update the messages state with the response
+      if (result && result.text) {
+        setMessages((prev) => [...prev, { text: result.text, isUser: false }]);
+      }
     } catch (error) {
       console.error("Error:", error);
       setMessages((prev) => [
@@ -274,33 +342,16 @@ const Chatbot = () => {
 
   const handleNewChat = async () => {
     try {
-      const response = await fetch("http://localhost:8000/api/ai/clear/", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+      if (currentUser) {
+        await dispatch(createNewSession(currentUser));
+        setMessages([]);
+        setInput("");
+        setSnackbar({
+          open: true,
+          message: "New chat started",
+          severity: "success",
+        });
       }
-
-      // Clear the messages state and input
-      setMessages([]);
-      setInput("");
-
-      // Show success message
-      setSnackbar({
-        open: true,
-        message: "New chat started",
-        severity: "success",
-      });
-
-      // Force a re-render of the welcome message
-      setTimeout(() => {
-        scrollToBottom();
-      }, 100);
     } catch (error) {
       console.error("Error starting new chat:", error);
       setSnackbar({
@@ -323,21 +374,57 @@ const Chatbot = () => {
     setIsLoading(true);
 
     try {
-      const response = await fetch("http://localhost:8000/api/ai/chat/", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
-        body: JSON.stringify({ query: userMessage }),
-      });
+      let sessionId = currentSession?.id;
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+      // If no current session exists, create a new one
+      if (!sessionId && currentUser) {
+        try {
+          const newSession = await dispatch(
+            createNewSession(currentUser)
+          ).unwrap();
+          sessionId = newSession.id;
+          console.log("Created new session with ID:", sessionId);
+        } catch (error) {
+          console.error("Error creating session:", error);
+          setSnackbar({
+            open: true,
+            message: "Failed to create a new chat session. Please try again.",
+            severity: "error",
+          });
+          setIsLoading(false);
+          return;
+        }
       }
 
-      const data = await response.json();
-      setMessages((prev) => [...prev, { text: data.response, isUser: false }]);
+      if (!sessionId) {
+        console.error("No session ID available");
+        setSnackbar({
+          open: true,
+          message: "Unable to send message. Please try again.",
+          severity: "error",
+        });
+        setIsLoading(false);
+        return;
+      }
+
+      const messageData = {
+        id: Date.now(),
+        session_id: sessionId,
+        sender: "user",
+        message: userMessage,
+        created_at: new Date().toISOString(),
+      };
+
+      console.log("Sending example message with data:", messageData);
+
+      // Send user message and get the response
+      const result = await dispatch(sendUserInput(messageData)).unwrap();
+      console.log("Example message sent successfully:", result);
+
+      // Directly update the messages state with the response
+      if (result && result.text) {
+        setMessages((prev) => [...prev, { text: result.text, isUser: false }]);
+      }
     } catch (error) {
       console.error("Error:", error);
       setMessages((prev) => [
@@ -364,23 +451,32 @@ const Chatbot = () => {
         <Box
           sx={{
             p: 2,
-            backgroundColor: "primary.main",
+            background: "linear-gradient(135deg, #1e40af 0%, #3b82f6 100%)",
             color: "white",
             display: "flex",
             justifyContent: "space-between",
             alignItems: "center",
+            borderBottom: "1px solid rgba(255,255,255,0.1)",
           }}
         >
           <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-            <SmartToyIcon />
-            <Typography variant="h6">Medical Assistant</Typography>
+            <SmartToyIcon sx={{ fontSize: 28 }} />
+            <Typography variant="h6" sx={{ fontWeight: 600 }}>
+              Medical Assistant
+            </Typography>
           </Box>
           <Box sx={{ display: "flex", gap: 1 }}>
             <Tooltip title="New Chat">
               <IconButton
                 color="inherit"
                 onClick={handleNewChat}
-                disabled={isLoading}
+                disabled={loading}
+                sx={{
+                  transition: "transform 0.2s ease",
+                  "&:hover": {
+                    transform: "scale(1.1)",
+                  },
+                }}
               >
                 <AddIcon />
               </IconButton>
@@ -389,7 +485,13 @@ const Chatbot = () => {
               <IconButton
                 color="inherit"
                 onClick={handleClearChat}
-                disabled={isLoading}
+                disabled={loading}
+                sx={{
+                  transition: "transform 0.2s ease",
+                  "&:hover": {
+                    transform: "scale(1.1)",
+                  },
+                }}
               >
                 <DeleteIcon />
               </IconButton>
@@ -412,13 +514,27 @@ const Chatbot = () => {
               }}
             >
               <SmartToyIcon
-                sx={{ fontSize: 60, mb: 2, color: "primary.main" }}
+                sx={{
+                  fontSize: 80,
+                  mb: 2,
+                  color: "primary.main",
+                  animation: "float 3s ease-in-out infinite",
+                  "@keyframes float": {
+                    "0%, 100%": {
+                      transform: "translateY(0)",
+                    },
+                    "50%": {
+                      transform: "translateY(-10px)",
+                    },
+                  },
+                }}
               />
-              <Typography variant="h6" gutterBottom>
+              <Typography variant="h5" gutterBottom sx={{ fontWeight: 600 }}>
                 Welcome to LLMediCare Assistant
               </Typography>
-              <Typography variant="body1" sx={{ mb: 3 }}>
-                Ask me any medical questions, and I'll do my best to help you.
+              <Typography variant="body1" sx={{ mb: 4, maxWidth: "600px" }}>
+                Ask me any medical questions, and I'll do my best to help you
+                with accurate and reliable information.
               </Typography>
               <Box
                 sx={{
@@ -428,7 +544,11 @@ const Chatbot = () => {
                   maxWidth: "80%",
                 }}
               >
-                <Typography variant="subtitle1" fontWeight="bold">
+                <Typography
+                  variant="subtitle1"
+                  fontWeight="bold"
+                  color="primary"
+                >
                   Example questions you can ask:
                 </Typography>
                 <Button
@@ -439,7 +559,16 @@ const Chatbot = () => {
                       "What are common symptoms of flu and cold?"
                     )
                   }
-                  sx={{ justifyContent: "flex-start", textAlign: "left" }}
+                  disabled={loading}
+                  sx={{
+                    justifyContent: "flex-start",
+                    textAlign: "left",
+                    transition: "all 0.2s ease",
+                    "&:hover": {
+                      transform: "translateX(5px)",
+                      backgroundColor: "rgba(25, 118, 210, 0.04)",
+                    },
+                  }}
                 >
                   What are common symptoms of flu and cold?
                 </Button>
@@ -449,7 +578,16 @@ const Chatbot = () => {
                   onClick={() =>
                     handleExampleClick("How can I maintain a healthy heart?")
                   }
-                  sx={{ justifyContent: "flex-start", textAlign: "left" }}
+                  disabled={loading}
+                  sx={{
+                    justifyContent: "flex-start",
+                    textAlign: "left",
+                    transition: "all 0.2s ease",
+                    "&:hover": {
+                      transform: "translateX(5px)",
+                      backgroundColor: "rgba(25, 118, 210, 0.04)",
+                    },
+                  }}
                 >
                   How can I maintain a healthy heart?
                 </Button>
@@ -457,7 +595,16 @@ const Chatbot = () => {
                   variant="outlined"
                   color="primary"
                   onClick={() => handleExampleClick("What is a balanced diet?")}
-                  sx={{ justifyContent: "flex-start", textAlign: "left" }}
+                  disabled={loading}
+                  sx={{
+                    justifyContent: "flex-start",
+                    textAlign: "left",
+                    transition: "all 0.2s ease",
+                    "&:hover": {
+                      transform: "translateX(5px)",
+                      backgroundColor: "rgba(25, 118, 210, 0.04)",
+                    },
+                  }}
                 >
                   What is a balanced diet?
                 </Button>
@@ -469,6 +616,17 @@ const Chatbot = () => {
                 key={index}
                 sx={{
                   display: "flex",
+                  animation: "fadeIn 0.3s ease",
+                  "@keyframes fadeIn": {
+                    from: {
+                      opacity: 0,
+                      transform: "translateY(10px)",
+                    },
+                    to: {
+                      opacity: 1,
+                      transform: "translateY(0)",
+                    },
+                  },
                 }}
               >
                 <Box
@@ -477,6 +635,7 @@ const Chatbot = () => {
                     flexDirection: "column",
                     alignItems: message.isUser ? "flex-end" : "flex-start",
                     mb: 2,
+                    width: "100%",
                   }}
                 >
                   <Box
@@ -488,8 +647,15 @@ const Chatbot = () => {
                     }}
                   >
                     {!message.isUser && (
-                      <Avatar sx={{ bgcolor: "primary.main" }}>
-                        <SmartToyIcon />
+                      <Avatar
+                        sx={{
+                          bgcolor: "primary.main",
+                          width: 32,
+                          height: 32,
+                          boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
+                        }}
+                      >
+                        <SmartToyIcon sx={{ fontSize: 18 }} />
                       </Avatar>
                     )}
                     <MessageBubble isUser={message.isUser}>
@@ -500,8 +666,15 @@ const Chatbot = () => {
                       )}
                     </MessageBubble>
                     {message.isUser && (
-                      <Avatar sx={{ bgcolor: "secondary.main" }}>
-                        <PersonIcon />
+                      <Avatar
+                        sx={{
+                          bgcolor: "secondary.main",
+                          width: 32,
+                          height: 32,
+                          boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
+                        }}
+                      >
+                        <PersonIcon sx={{ fontSize: 18 }} />
                       </Avatar>
                     )}
                   </Box>
@@ -510,8 +683,23 @@ const Chatbot = () => {
             ))
           )}
 
-          {isLoading && (
-            <Box sx={{ display: "flex", justifyContent: "center", my: 2 }}>
+          {loading && (
+            <Box
+              sx={{
+                display: "flex",
+                justifyContent: "center",
+                my: 2,
+                animation: "pulse 1.5s ease-in-out infinite",
+                "@keyframes pulse": {
+                  "0%, 100%": {
+                    opacity: 1,
+                  },
+                  "50%": {
+                    opacity: 0.5,
+                  },
+                },
+              }}
+            >
               <CircularProgress size={24} />
             </Box>
           )}
@@ -529,11 +717,20 @@ const Chatbot = () => {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyPress={(e) => e.key === "Enter" && handleSend()}
-            disabled={isLoading}
+            disabled={loading}
             size="small"
             sx={{
               "& .MuiOutlinedInput-root": {
                 borderRadius: "24px",
+                backgroundColor: "#f8fafc",
+                transition: "all 0.2s ease",
+                "&:hover": {
+                  backgroundColor: "#f1f5f9",
+                },
+                "&.Mui-focused": {
+                  backgroundColor: "#ffffff",
+                  boxShadow: "0 0 0 2px rgba(25, 118, 210, 0.2)",
+                },
               },
             }}
           />
@@ -541,8 +738,17 @@ const Chatbot = () => {
             variant="contained"
             color="primary"
             onClick={handleSend}
-            disabled={isLoading}
-            sx={{ borderRadius: "24px", px: 3 }}
+            disabled={loading}
+            sx={{
+              borderRadius: "24px",
+              px: 3,
+              py: 1,
+              transition: "all 0.2s ease",
+              "&:hover": {
+                transform: "scale(1.05)",
+                boxShadow: "0 4px 12px rgba(25, 118, 210, 0.2)",
+              },
+            }}
             endIcon={<SendIcon />}
           >
             Send
@@ -559,7 +765,11 @@ const Chatbot = () => {
         <Alert
           onClose={handleCloseSnackbar}
           severity={snackbar.severity}
-          sx={{ width: "100%" }}
+          sx={{
+            width: "100%",
+            borderRadius: "12px",
+            boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+          }}
         >
           {snackbar.message}
         </Alert>

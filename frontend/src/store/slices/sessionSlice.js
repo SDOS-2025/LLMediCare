@@ -9,14 +9,19 @@ export const sendUserInput = createAsyncThunk(
   "session/sendUserInput",
   async (inputText, { dispatch, rejectWithValue }) => {
     try {
+      if (!inputText.session_id) {
+        throw new Error("Session ID is required");
+      }
+
+      // First add the user's message to the session
       await dispatch(addChatToSession({ ...inputText }));
-      console.log(inputText);
+
+      // Then get the AI response
       const response = await axios.post(`${API_BASE1}/chat/`, {
         query: inputText.message,
       });
-      console.log(response.data);
-      // Append chat message to session in backend
 
+      // Create the AI's response message
       const llmMessage = {
         id: Date.now(),
         session_id: inputText.session_id,
@@ -24,11 +29,21 @@ export const sendUserInput = createAsyncThunk(
         message: response.data.response,
         created_at: new Date().toISOString(),
       };
+
+      // Add the AI's response to the session
       await dispatch(addChatToSession({ ...llmMessage }));
-      return response.data.response;
+
+      // Return the formatted message for the UI
+      return {
+        text: response.data.response,
+        isUser: false,
+      };
     } catch (error) {
+      console.error("Error in sendUserInput:", error);
       return rejectWithValue(
-        error.response?.data || "Failed to get response from the model"
+        error.response?.data ||
+          error.message ||
+          "Failed to get response from the model"
       );
     }
   }
@@ -39,16 +54,21 @@ export const createNewSession = createAsyncThunk(
   "session/createNewSession",
   async (userData, { dispatch, rejectWithValue }) => {
     try {
-      console.log(userData);
+      if (!userData || !userData.email) {
+        throw new Error("User email is required to create a session");
+      }
+
       const response = await axios.post(`${API_BASE2}/sessions/`, {
         user_email: userData.email,
       });
-      console.log(response.data);
-      dispatch(getUserSessions(userData.email));
+
+      // After creating the session, fetch all user sessions
+      await dispatch(getUserSessions(userData.email));
+
       return response.data;
     } catch (error) {
       return rejectWithValue(
-        error.response?.data || "Failed to create session"
+        error.response?.data || error.message || "Failed to create session"
       );
     }
   }
@@ -57,17 +77,19 @@ export const createNewSession = createAsyncThunk(
 // Async thunk to get all sessions for a user by email
 export const getUserSessions = createAsyncThunk(
   "session/getUserSessions",
-  async (userData, { rejectWithValue }) => {
+  async (userEmail, { rejectWithValue }) => {
     try {
-      console.log(userData.email);
+      if (!userEmail) {
+        throw new Error("User email is required to fetch sessions");
+      }
+
       const response = await axios.get(
-        `${API_BASE2}/sessions/?email=${userData.email}`
+        `${API_BASE2}/sessions/?email=${userEmail}`
       );
-      console.log(response.data);
       return response.data;
     } catch (error) {
       return rejectWithValue(
-        error.response?.data || "Failed to fetch user sessions"
+        error.response?.data || error.message || "Failed to fetch user sessions"
       );
     }
   }
@@ -77,12 +99,17 @@ export const addChatToSession = createAsyncThunk(
   "session/addChatToSession",
   async (inputMessage, { rejectWithValue }) => {
     try {
+      if (!inputMessage || !inputMessage.session_id) {
+        throw new Error("Session ID is required to add chat");
+      }
+
       const message = {
         id: inputMessage.id,
         sender: inputMessage.sender,
         content: inputMessage.message,
         created_at: inputMessage.created_at,
       };
+
       const response = await axios.post(
         `${API_BASE2}/sessions/${inputMessage.session_id}/add_chat/`,
         { message: message }
@@ -90,7 +117,7 @@ export const addChatToSession = createAsyncThunk(
       return response.data;
     } catch (error) {
       return rejectWithValue(
-        error.response?.data || "Failed to add chat to session"
+        error.response?.data || error.message || "Failed to add chat to session"
       );
     }
   }
@@ -111,29 +138,68 @@ export const deleteSession = createAsyncThunk(
   }
 );
 
-const sessionSlice = createSlice({
+const initialState = {
+  currentSession: null,
+  sessions: [],
+  messages: [],
+  loading: false,
+  error: null,
+};
+
+// Helper function to get user-specific storage key
+const getUserStorageKey = (userId) => `chat_history_${userId}`;
+
+// Helper function to load chat history from localStorage
+const loadChatHistory = (userId) => {
+  try {
+    const stored = localStorage.getItem(getUserStorageKey(userId));
+    return stored ? JSON.parse(stored) : [];
+  } catch (error) {
+    console.error("Error loading chat history:", error);
+    return [];
+  }
+};
+
+// Helper function to save chat history to localStorage
+const saveChatHistory = (userId, messages) => {
+  try {
+    localStorage.setItem(getUserStorageKey(userId), JSON.stringify(messages));
+  } catch (error) {
+    console.error("Error saving chat history:", error);
+  }
+};
+
+export const sessionSlice = createSlice({
   name: "session",
-  initialState: {
-    input: "",
-    response: "",
-    loading: false,
-    error: null,
-    cur_session: null,
-    user_sessions: [],
-    user: null,
-    isAuthenticated: false,
-  },
+  initialState,
   reducers: {
     setInput: (state, action) => {
       state.input = action.payload;
     },
     setCurrentSession: (state, action) => {
-      state.cur_session = action.payload;
+      state.currentSession = action.payload;
+      if (action.payload?.user_id) {
+        state.messages = loadChatHistory(action.payload.user_id);
+      }
     },
     clearSession: (state) => {
       state.input = "";
       state.response = "";
       state.error = null;
+    },
+    addMessage: (state, action) => {
+      state.messages.push(action.payload);
+      if (state.currentSession?.user_id) {
+        saveChatHistory(state.currentSession.user_id, state.messages);
+      }
+    },
+    clearMessages: (state) => {
+      state.messages = [];
+      if (state.currentSession?.user_id) {
+        localStorage.removeItem(
+          getUserStorageKey(state.currentSession.user_id)
+        );
+      }
     },
   },
   extraReducers: (builder) => {
@@ -145,7 +211,12 @@ const sessionSlice = createSlice({
       })
       .addCase(sendUserInput.fulfilled, (state, action) => {
         state.loading = false;
-        state.response = action.payload;
+        if (action.payload) {
+          state.messages.push(action.payload);
+          if (state.currentSession?.user_id) {
+            saveChatHistory(state.currentSession.user_id, state.messages);
+          }
+        }
       })
       .addCase(sendUserInput.rejected, (state, action) => {
         state.loading = false;
@@ -154,21 +225,21 @@ const sessionSlice = createSlice({
 
       // Create new session
       .addCase(createNewSession.fulfilled, (state, action) => {
-        state.cur_session = action.payload;
+        state.currentSession = action.payload;
       })
 
       // Get all sessions for user
       .addCase(getUserSessions.fulfilled, (state, action) => {
-        state.user_sessions = action.payload;
+        state.sessions = action.payload;
       })
 
       .addCase(addChatToSession.fulfilled, (state, action) => {
-        state.cur_session.session_chats = action.payload.session_chats;
+        state.currentSession.session_chats = action.payload.session_chats;
       })
 
       // Delete a session
       .addCase(deleteSession.fulfilled, (state, action) => {
-        state.user_sessions = state.user_sessions.filter(
+        state.sessions = state.sessions.filter(
           (session) => session.id !== action.payload
         );
       });

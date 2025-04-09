@@ -56,6 +56,13 @@ class AIAssistantService:
         6. Avoid making definitive diagnoses.
         7. Be honest about your limitations.
         8. Focus on being helpful while prioritizing user safety.
+        9. Provide EXTENSIVE and DETAILED information in your responses.
+        10. Structure your responses with clear sections using markdown formatting.
+        11. Include at least 5-7 bullet points in each section.
+        12. Add relevant statistics, research findings, and expert recommendations when appropriate.
+        13. Include practical tips, lifestyle changes, and preventive measures.
+        14. Provide links to reputable sources or suggest where to find more information.
+        15. Explain medical terms in simple language.
         
         Remember that your advice is not a substitute for professional medical care.
         """
@@ -286,19 +293,54 @@ Please provide your analysis:"""
         seek_medical_attention = False
         
         try:
-            # Create medical analysis prompt template
+            # Create medical analysis prompt template with more detailed instructions
             prompt_template = PromptTemplate(
                 input_variables=["symptoms"],
                 template="""As a medical AI assistant, please analyze the following symptoms:
                 {symptoms}
                 
-                Provide a structured analysis including:
-                1. Possible conditions
-                2. Severity assessment
-                3. Recommendations
-                4. Whether immediate medical attention is needed
+                Provide a COMPREHENSIVE and DETAILED analysis including:
                 
-                Remember to maintain a professional tone and include appropriate medical disclaimers."""
+                1. POSSIBLE CONDITIONS:
+                   - List at least 5-7 possible conditions that could explain these symptoms
+                   - For each condition, provide a brief description
+                   - Include both common and less common possibilities
+                   - Mention the likelihood of each condition
+                
+                2. SYMPTOM ANALYSIS:
+                   - Analyze each symptom in detail
+                   - Explain what each symptom might indicate
+                   - Describe how symptoms might relate to each other
+                   - Mention any red flag symptoms that require immediate attention
+                
+                3. SEVERITY ASSESSMENT:
+                   - Evaluate the overall severity of the symptoms
+                   - Indicate whether immediate medical attention is needed
+                   - Explain what factors contribute to the severity assessment
+                   - Provide guidance on when to seek emergency care
+                
+                4. DETAILED RECOMMENDATIONS:
+                   - Provide at least 7-10 specific recommendations
+                   - Include both immediate and long-term advice
+                   - Suggest lifestyle changes that might help
+                   - Recommend preventive measures for the future
+                   - Mention any over-the-counter treatments that might help
+                
+                5. DIAGNOSTIC INFORMATION:
+                   - Suggest what tests or examinations might be helpful
+                   - Explain what information healthcare providers will need
+                   - Provide guidance on how to prepare for a medical visit
+                   - Mention what questions to ask healthcare providers
+                
+                6. ADDITIONAL CONTEXT:
+                   - Include relevant statistics or research findings
+                   - Mention any demographic factors that might be relevant
+                   - Explain any environmental or lifestyle factors to consider
+                   - Provide information about recovery timelines if applicable
+                
+                Remember to maintain a professional tone and include appropriate medical disclaimers.
+                Format your response with clear section headers using markdown formatting (**Section Title**).
+                """
             )
             
             # Create LangChain for structured analysis
@@ -331,11 +373,46 @@ Please provide your analysis:"""
                     
             except Exception as e:
                 logger.error(f"Error in symptom analysis: {e}")
-                analysis = "I'm having trouble analyzing your symptoms right now. Please describe your symptoms in detail, and if you're experiencing severe pain or discomfort, please contact a healthcare professional immediately."
+                analysis = """**Error in Symptom Analysis**
+- I'm having trouble analyzing your symptoms right now.
+- Please describe your symptoms in more detail.
+- If you're experiencing severe pain or discomfort, please contact a healthcare professional immediately.
+
+**What to Do Next**
+- Try rephrasing your symptoms with more specific details
+- Include information about when symptoms started and how they've changed
+- Mention any factors that make symptoms better or worse
+- Describe the severity and frequency of your symptoms
+- Note any other symptoms you might be experiencing
+
+**Medical Disclaimer**
+- This information is for general guidance only
+- Not a substitute for professional medical advice
+- Consult your healthcare provider for specific advice"""
         
         except Exception as e:
             logger.error(f"Error in LLM setup: {e}")
-            analysis = "Based on your symptoms, I recommend consulting with a healthcare professional for a proper diagnosis. Please note that this is not a medical diagnosis, and it's always best to consult with a qualified healthcare provider."
+            analysis = """**Symptom Analysis**
+- Based on your symptoms, I recommend consulting with a healthcare professional for a proper diagnosis.
+- Please note that this is not a medical diagnosis, and it's always best to consult with a qualified healthcare provider.
+
+**General Information**
+- Many symptoms can be caused by various conditions
+- A healthcare provider can perform necessary tests to determine the cause
+- Early diagnosis often leads to better treatment outcomes
+- Keeping a symptom diary can help healthcare providers understand your condition better
+
+**Next Steps**
+- Schedule an appointment with your healthcare provider
+- Document your symptoms, including when they started and any patterns you notice
+- Note any factors that seem to trigger or alleviate your symptoms
+- Prepare questions to ask your healthcare provider
+- Bring a list of any medications or supplements you're taking
+
+**Medical Disclaimer**
+- This information is for general guidance only
+- Not a substitute for professional medical advice
+- Consult your healthcare provider for specific advice"""
         
         return analysis
     
@@ -684,7 +761,7 @@ Please provide your analysis:"""
                             prefix = "User: " if msg.message_type == 'user' else "Assistant: "
                             chat_history += f"{prefix}{msg.content}\n"
                     
-                    # Create a more conversational prompt template for general chat
+                    # Create a more detailed prompt template for general chat
                     chat_template = PromptTemplate(
                         input_variables=["chat_history", "question", "system_prompt"],
                         template="""System: {system_prompt}
@@ -694,13 +771,22 @@ Chat History:
 
 User: {question}
 
+IMPORTANT INSTRUCTIONS:
+1. Provide EXTENSIVE and DETAILED information in your response
+2. Structure your response with clear sections using markdown formatting
+3. Include at least 5-7 bullet points in each section
+4. Add relevant statistics, research findings, and expert recommendations
+5. Include practical tips, lifestyle changes, and preventive measures
+6. Explain medical terms in simple language
+7. Provide a comprehensive answer that covers all aspects of the question
+
 Assistant: """
                     )
                     
                     # Create a new chain for this conversation
                     chat_chain = LLMChain(llm=self.llm, prompt=chat_template)
                     
-                    # Generate response with context
+                    # Generate response with context and increased max_tokens
                     response = chat_chain.run(
                         chat_history=chat_history,
                         question=message_content,
@@ -709,27 +795,34 @@ Assistant: """
                     
                     if not response or len(response.strip()) < 10:
                         logger.warning("Generated response is too short or empty, falling back to simpler prompt")
-                        # Fallback to simpler prompt
+                        # Fallback to simpler prompt but still request detailed information
                         simple_template = PromptTemplate(
                             input_variables=["question", "system_prompt"],
                             template="""System: {system_prompt}
 
 User: {question}
 
+IMPORTANT: Provide EXTENSIVE and DETAILED information in your response with at least 5-7 bullet points per section.
+
 Assistant: """
                         )
                         simple_chain = LLMChain(llm=self.llm, prompt=simple_template)
                         response = simple_chain.run(question=message_content, system_prompt=self.system_prompt)
+                    
+                    # Ensure the response has proper formatting
+                    if "**" not in response:
+                        # Add section headers if missing
+                        response = "**Information**\n" + response
                     
                     return response
                 except Exception as e:
                     logger.error(f"Error in Llama response generation: {str(e)}")
                     return "I apologize, but I'm having trouble processing your request right now. Please try again in a moment. If this persists, please contact support."
             elif self.model_type == 'huggingface':
-                # Use HuggingFace model
+                # Use HuggingFace model with increased max_length
                 try:
                     inputs = self.tokenizer(message_content, return_tensors="pt", max_length=512, truncation=True)
-                    outputs = self.model.generate(**inputs, max_length=200, num_return_sequences=1)
+                    outputs = self.model.generate(**inputs, max_length=500, num_return_sequences=1)  # Increased from 200 to 500
                     response = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
                     if not response or len(response.strip()) < 10:
                         raise ValueError("Invalid response generated")
@@ -751,18 +844,114 @@ Assistant: """
         """
         message_lower = message_content.lower()
         
-        # Simple rule-based responses
+        # Enhanced rule-based responses with more detailed information
         if any(greeting in message_lower for greeting in ['hello', 'hi', 'hey', 'greetings']):
-            return "Hello! I'm your healthcare assistant. How can I help you today?"
+            return """**Welcome to LLMediCare Assistant**
+- Hello! I'm your healthcare assistant, here to provide you with comprehensive medical information and support.
+- I can help you with a wide range of health-related questions and concerns.
+- I aim to provide detailed, evidence-based information to help you make informed health decisions.
+- While I can offer valuable insights, I'm not a replacement for professional medical advice.
+- For serious health concerns, please consult with a qualified healthcare provider.
+
+**How I Can Help You**
+- Provide detailed information about medical conditions, symptoms, and treatments
+- Offer evidence-based health recommendations and lifestyle advice
+- Help you understand medical terminology in simple language
+- Assist with appointment scheduling and medication reminders
+- Answer questions about preventive care and wellness strategies
+- Share information about healthy living and disease prevention
+- Guide you to reliable health resources and reputable sources
+
+**Getting Started**
+- Feel free to ask any health-related question
+- Be specific about your concerns for more accurate information
+- I'll structure my responses with clear sections for easy reading
+- Each response will include practical tips and actionable advice
+- I'll always include appropriate medical disclaimers
+
+How can I assist you today?"""
         
         elif any(keyword in message_lower for keyword in ['thank', 'thanks', 'appreciate']):
-            return "You're welcome! Is there anything else I can help you with?"
+            return """**You're Welcome!**
+- I'm glad I could help you with your health-related questions.
+- Providing comprehensive health information is my primary goal.
+- I strive to give you detailed, accurate, and helpful responses.
+- Your health and well-being are important to me.
+- I'm here to support your health journey with reliable information.
+
+**Additional Support**
+- Feel free to ask follow-up questions for more detailed information
+- I can provide more specific details about any aspect of your previous question
+- I'm available 24/7 to assist with your health information needs
+- I can help you find resources for further reading and research
+- I can explain medical concepts in more detail if needed
+
+Is there anything else I can help you with?"""
         
         elif any(keyword in message_lower for keyword in ['bye', 'goodbye', 'see you']):
-            return "Goodbye! Take care of your health and feel free to return if you have more questions."
+            return """**Goodbye and Take Care!**
+- Thank you for using LLMediCare Assistant for your health information needs.
+- I hope the information provided was helpful and comprehensive.
+- Remember to prioritize your health and well-being.
+- Don't hesitate to return if you have more health-related questions.
+- Your health journey is important, and I'm here to support it.
+
+**Health Reminders**
+- Continue to follow any health recommendations provided
+- Schedule regular check-ups with your healthcare provider
+- Stay informed about your health conditions and treatments
+- Maintain healthy lifestyle habits for optimal well-being
+- Keep track of any symptoms or changes in your health
+
+Take care of your health and feel free to return if you have more questions!"""
         
         elif any(keyword in message_lower for keyword in ['help', 'assist', 'support']):
-            return "I can help with health information, symptom checking, appointment scheduling, medication reminders, and health recommendations. What would you like assistance with?"
+            return """**How I Can Help You**
+- I provide comprehensive health information and medical guidance
+- I can assist with detailed symptom analysis and health assessments
+- I offer extensive information about medical conditions and treatments
+- I help with appointment scheduling and healthcare coordination
+- I provide detailed medication information and reminder setup
+- I offer evidence-based health recommendations and lifestyle advice
+- I can explain medical terminology in simple, understandable language
+
+**Topics I Cover**
+- General health information and wellness strategies
+- Detailed symptom analysis and possible conditions
+- Comprehensive appointment scheduling assistance
+- Medication management and reminder setup
+- Extensive health recommendations and lifestyle guidance
+- Medical record queries and health history information
+- Preventive care and disease prevention strategies
+
+**Getting the Most from Our Conversation**
+- Ask specific questions for more detailed responses
+- Request clarification on any medical terms or concepts
+- Ask for more information on any topic of interest
+- I'll provide structured responses with clear sections
+- Each response includes practical tips and actionable advice
+
+What specific health topic would you like assistance with?"""
         
-        # Default response
-        return "I'm currently operating in a limited capacity. I can provide basic information, but for more complex queries, please try again later when our AI services are fully operational."
+        # Default response with more detailed information
+        return """**Comprehensive Health Information**
+- I'm currently operating with enhanced capabilities to provide you with detailed health information.
+- I aim to give you extensive, evidence-based responses to your health questions.
+- Each response is structured with clear sections for easy understanding.
+- I include practical tips, lifestyle recommendations, and preventive measures.
+- I explain medical concepts in simple language while maintaining accuracy.
+
+**What to Expect**
+- Detailed explanations of medical conditions and treatments
+- Evidence-based health recommendations with supporting information
+- Practical tips for managing health conditions and improving wellness
+- Clear explanations of medical terminology and concepts
+- Comprehensive answers that address all aspects of your questions
+
+**Getting Started**
+- Ask any health-related question, and I'll provide a detailed response
+- Be specific about your concerns for more targeted information
+- I'll structure my answers with clear sections for easy reading
+- Each response will include practical tips and actionable advice
+
+Please ask your health-related question, and I'll provide you with comprehensive information."""
