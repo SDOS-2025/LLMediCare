@@ -14,7 +14,7 @@ const firebaseConfig = {
   storageBucket: "llmedicare-f27b0.firebasestorage.app",
   messagingSenderId: "213799874326",
   appId: "1:213799874326:web:b732e49262e22943d4aa37",
-  measurementId: "G-XXVZHQHVV4",
+  measurementId: "G-XXVZHQHVV4"
 };
 
 // Initialize Firebase

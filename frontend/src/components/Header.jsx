@@ -1,68 +1,83 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import styled from 'styled-components';
-import { FaBars } from 'react-icons/fa';
-import Search from './Search';
 
-export default function Header({ toggleSidebar, sidebarOpen }) {
+export default function Header ({ toggleSidebar, sidebarOpen }) {
   return (
     <HeaderContainer>
-      <LeftSection>
-        <MenuButton onClick={toggleSidebar}>
-          <FaBars />
-        </MenuButton>
-        <Search />
-      </LeftSection>
-      <RightSection>
-        {/* Add any right-side header content here */}
-      </RightSection>
+      <NavContainer>
+        <FlexContainer>
+          <div className="flex items-center">
+            <HamburgerButton
+              onClick={toggleSidebar}
+              aria-label="Toggle Sidebar"
+            >
+              {sidebarOpen ? (
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M18 6L6 18"></path>
+                  <path d="M6 6L18 18"></path>
+                </svg>
+              ) : (
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M3 12h18"></path>
+                  <path d="M3 6h18"></path>
+                  <path d="M3 18h18"></path>
+                </svg>
+              )}
+            </HamburgerButton>
+            
+            <LogoContainer to="/home">
+              <LogoIcon viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M22 12H18L15 21L9 3L6 12H2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </LogoIcon>
+              <LogoText>LLMediCare</LogoText>
+            </LogoContainer>
+          </div>
+        </FlexContainer>
+      </NavContainer>
     </HeaderContainer>
   );
-}
+};
 
 const HeaderContainer = styled.header`
+  background-color: #ffffff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
+  z-index: 50;
   height: 64px;
-  background-color: white;
-  border-bottom: 1px solid #e2e8f0;
+`;
+
+const NavContainer = styled.nav`
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 0 16px;
+  height: 100%;
+`;
+
+const FlexContainer = styled.div`
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 1.5rem;
-  z-index: 40;
+  height: 100%;
 `;
 
-const LeftSection = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 1.5rem;
-  flex: 1;
-`;
-
-const RightSection = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-`;
-
-const MenuButton = styled.button`
-  background: none;
-  border: none;
-  color: #64748b;
-  cursor: pointer;
-  padding: 0.5rem;
+const HamburgerButton = styled.button`
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 6px;
+  width: 40px;
+  height: 40px;
+  margin-right: 16px;
+  color: #64748b;
+  border-radius: 8px;
   transition: all 0.2s ease;
-
+  
   &:hover {
+    color: #334155;
     background-color: #f1f5f9;
-    color: #0f172a;
   }
 `;
 
