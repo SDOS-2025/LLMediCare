@@ -47,9 +47,11 @@ export default function ChatInterface() {
     window.scrollTo(0, 0); // Scroll to the top of the page when the component is mounted
   }, []);
 
+  // Create a new session on component mount if logged in
   useEffect(() => {
     if (currentUser) {
-      dispatch(getUserSessions(currentUser));
+      // Instead of loading existing sessions, create a new one
+      handleCreateNewSession();
     }
   }, [currentUser]);
 

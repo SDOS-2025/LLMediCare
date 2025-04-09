@@ -155,6 +155,56 @@ class EnhancedAIAgent:
 - Consider professional counseling if needed
 - Join support groups
 - Develop a daily relaxation routine"""
+            },
+            {
+                "query": "I broke my arm at the gym. What should I do?",
+                "response": """**Information**
+- Broken arms typically cause severe pain, swelling, and visible deformity
+- You may experience limited movement or a grating sensation
+- The injured area may appear bruised or discolored
+- Fractures require professional medical treatment
+
+**Recommendations**
+- Immobilize the injured arm using a sling or splint
+- Apply ice wrapped in a cloth to reduce swelling (20 minutes at a time)
+- Take over-the-counter pain medication like ibuprofen to manage pain
+- Seek immediate medical attention at an emergency room or urgent care
+
+**Medical Disclaimer**
+- This information is for general guidance only
+- Not a substitute for professional medical advice
+- Consult your healthcare provider for specific advice
+
+**Next Steps**
+- Go to an emergency room or urgent care immediately
+- Ask for an X-ray to confirm the fracture
+- Follow the treatment plan from your healthcare provider
+- Consider physical therapy during recovery"""
+            },
+            {
+                "query": "injured at gym broken bone",
+                "response": """**Information**
+- Gym injuries involving broken bones require immediate medical attention
+- Common signs include severe pain, swelling, deformity, and limited mobility
+- The severity and healing time depend on the location and type of fracture
+- Proper treatment is essential for proper bone healing
+
+**Recommendations**
+- Stop exercising immediately and stabilize the injured area
+- Apply ice wrapped in cloth (not directly on skin) to reduce swelling
+- Elevate the injured area if possible to reduce blood flow and swelling
+- Take acetaminophen or ibuprofen for pain management if not contraindicated
+
+**Medical Disclaimer**
+- This information is for general guidance only
+- Not a substitute for professional medical advice
+- Consult your healthcare provider for specific advice
+
+**Next Steps**
+- Seek emergency medical care for proper diagnosis and treatment
+- Follow all medical instructions for immobilization (cast, splint, etc.)
+- Attend all follow-up appointments to monitor healing
+- Consider physical therapy as recommended by your doctor"""
             }
         ]
         
@@ -183,18 +233,22 @@ class EnhancedAIAgent:
         max_similarity_idx = torch.argmax(similarities).item()
         max_similarity = similarities[max_similarity_idx].item()
         
-        # If similarity is too low, return a generic response
-        if max_similarity < 0.5:
-            return """**Information**
-- I understand you have a health-related question
-- Without proper medical evaluation, I cannot provide specific medical advice
-- Please consult a healthcare professional for personalized guidance
+        logger.info(f"Query: {query}")
+        logger.info(f"Most similar knowledge entry: {self.medical_knowledge[max_similarity_idx]['query']}")
+        logger.info(f"Similarity score: {max_similarity}")
+        
+        # If similarity is too low, return a more dynamic response
+        if max_similarity < 0.4:
+            return f"""**Information**
+- Your query about "{query}" requires medical assessment
+- Without proper medical evaluation, I can only provide general guidance
+- Based on your description, you should consider getting professional medical help
 
 **Recommendations**
-- Document your symptoms
-- Keep track of when they started
-- Note any triggers or patterns
-- Prepare questions for your healthcare provider
+- Document your specific symptoms and their timeline
+- If experiencing severe pain, swelling, or limited mobility, seek medical attention
+- For mild symptoms, rest and monitor for changes
+- Take appropriate over-the-counter medication as directed on the packaging
 
 **Medical Disclaimer**
 - This information is for general guidance only
@@ -203,8 +257,8 @@ class EnhancedAIAgent:
 
 **Next Steps**
 - Schedule an appointment with your doctor
-- Bring your symptom history
-- Be ready to discuss your concerns
+- For urgent concerns, visit an emergency room or urgent care
+- Prepare questions about your specific situation
 - Follow professional medical advice"""
         
         # Get the response from the medical knowledge base

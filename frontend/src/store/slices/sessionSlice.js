@@ -326,6 +326,27 @@ const loadUserSessions = (userEmail) => {
   }
 };
 
+// Add this function to clear all session-related data from localStorage
+export const clearAllStoredSessions = () => {
+  try {
+    // Get all keys from localStorage
+    const keys = Object.keys(localStorage);
+    
+    // Find and remove all session-related keys
+    keys.forEach(key => {
+      if (key.startsWith('chat_history_') || key.startsWith('user_sessions_') || key.startsWith('current_session')) {
+        localStorage.removeItem(key);
+      }
+    });
+    
+    console.log('All localStorage session data cleared');
+    return true;
+  } catch (error) {
+    console.error('Error clearing localStorage:', error);
+    return false;
+  }
+};
+
 export const sessionSlice = createSlice({
   name: "session",
   initialState,
@@ -357,6 +378,12 @@ export const sessionSlice = createSlice({
           getUserStorageKey(state.currentSession.user_id)
         );
       }
+    },
+    clearAllLocalStorage: (state) => {
+      clearAllStoredSessions();
+      state.sessions = [];
+      state.currentSession = null;
+      state.messages = [];
     },
   },
   extraReducers: (builder) => {
@@ -475,6 +502,7 @@ export const {
   setCurrentSession,
   addMessage,
   clearMessages,
+  clearAllLocalStorage,
 } = sessionSlice.actions;
 
 export default sessionSlice.reducer;

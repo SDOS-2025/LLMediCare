@@ -92,83 +92,166 @@ class MedicalChatbot:
         # Clean up the text first
         text = text.strip()
         
+        # Check if the text already has proper formatting
+        if (text.count("**Information**") == 1 or text.count("**Symptoms**") == 1) and \
+           text.count("**Recommendations**") == 1 and \
+           text.count("**Medical Disclaimer**") == 1 and \
+           text.count("**Next Steps**") == 1:
+            # Text already has the correct sections, just return as is
+            logger.info("Response already has correct formatting, using as-is")
+            return text
+        
         # Initialize formatted sections
-        formatted_sections = []
-        
-        # Define the expected sections in order
-        expected_sections = ["Information", "Symptoms", "Recommendations", "Medical Disclaimer", "Next Steps", "Error"]
-        
-        # Split the text into lines
-        lines = text.split('\n')
-        
-        # Process each line to identify sections and content
+        sections = {}
         current_section = None
         current_content = []
         
-        for line in lines:
-            line = line.strip()
-            if not line:
-                continue
+        # Define the expected sections in order
+        expected_sections = ["Information", "Symptoms", "Recommendations", "Medical Disclaimer", "Next Steps"]
+        
+        # First, check if there are any existing section headers
+        has_section_headers = any(f"**{section}**" in text for section in expected_sections)
+        
+        if has_section_headers:
+            # Parse existing sections
+            lines = text.split('\n')
             
-            # Check if this is a section header
-            if '**' in line:
-                # If we have a previous section, add it to formatted sections
-                if current_section and current_content:
-                    formatted_sections.append(f"**{current_section}**")
-                    formatted_sections.append('\n'.join(current_content))
+            # Process each line to identify sections and content
+            for line in lines:
+                line = line.strip()
+                if not line:
+                    continue
                 
-                # Extract new section name
-                section_name = line.replace('**', '').strip()
-                current_section = section_name
-                current_content = []
+                # Check if this is a section header
+                if line.startswith('**') and line.endswith('**'):
+                    # If we have a previous section, add it to sections
+                    if current_section and current_content:
+                        sections[current_section] = current_content
+                    
+                    # Extract new section name
+                    section_name = line.replace('**', '').strip()
+                    current_section = section_name
+                    current_content = []
+                else:
+                    # Format content line with bullet point if missing
+                    line = line.lstrip('•-*').strip()
+                    if line and not line.startswith('-'):
+                        line = f"- {line}"
+                    if line:  # Only add non-empty lines
+                        current_content.append(line)
+            
+            # Add the last section if exists
+            if current_section and current_content:
+                sections[current_section] = current_content
+        else:
+            # No sections found, split content into informational paragraphs
+            paragraphs = text.split('\n\n')
+            
+            # Assign paragraphs to appropriate sections
+            # First paragraph is usually information
+            if paragraphs:
+                info_text = paragraphs[0]
+                info_lines = []
+                for line in info_text.split('\n'):
+                    line = line.strip()
+                    if line:
+                        info_lines.append(f"- {line}")
+                sections["Information"] = info_lines
+            
+            # If there are more paragraphs, use them for recommendations and next steps
+            if len(paragraphs) > 1:
+                rec_text = paragraphs[1]
+                rec_lines = []
+                for line in rec_text.split('\n'):
+                    line = line.strip()
+                    if line:
+                        rec_lines.append(f"- {line}")
+                sections["Recommendations"] = rec_lines
+            
+            # Add standard medical disclaimer
+            sections["Medical Disclaimer"] = [
+                "- This information is for general guidance only",
+                "- Not a substitute for professional medical advice",
+                "- Consult your healthcare provider for specific advice"
+            ]
+            
+            # Add next steps if available, otherwise use default
+            if len(paragraphs) > 2:
+                next_text = paragraphs[2]
+                next_lines = []
+                for line in next_text.split('\n'):
+                    line = line.strip()
+                    if line:
+                        next_lines.append(f"- {line}")
+                sections["Next Steps"] = next_lines
             else:
-                # Format content line with bullet point
-                line = line.lstrip('•-*').strip()
-                if line:
-                    current_content.append(f"- {line}")
-        
-        # Add the last section if exists
-        if current_section and current_content:
-            formatted_sections.append(f"**{current_section}**")
-            formatted_sections.append('\n'.join(current_content))
-        
-        # If no sections were found or sections are incomplete, create a complete structure
-        if not formatted_sections or len(formatted_sections) < 4:
-            # Check if we have any content
-            if not formatted_sections:
-                # If no sections at all, use the entire text as information
-                formatted_sections = [
-                    "**Information**",
-                    f"- {text}",
-                    "\n**Recommendations**",
-                    "- Please consult with a healthcare professional for personalized advice\n- Keep track of your symptoms and their duration\n- Follow proper health and safety guidelines",
-                    "\n**Medical Disclaimer**",
-                    "- This information is for general guidance only\n- Not a substitute for professional medical advice\n- Consult your healthcare provider for specific advice",
-                    "\n**Next Steps**",
-                    "- Consider scheduling an appointment with your doctor\n- Document any specific concerns or questions\n- Follow up with a healthcare professional as needed"
+                sections["Next Steps"] = [
+                    "- Consider scheduling an appointment with your doctor",
+                    "- Document any specific concerns",
+                    "- Follow up with a healthcare professional as needed"
                 ]
-            else:
-                # If we have some sections but not all, add the missing ones
-                existing_sections = [s.replace('**', '') for s in formatted_sections[::2]]
-                
-                # Add missing sections
-                for section in expected_sections:
-                    if section not in existing_sections:
-                        if section == "Information" or section == "Symptoms":
-                            formatted_sections.append(f"\n**{section}**")
-                            formatted_sections.append("- No specific information provided")
-                        elif section == "Recommendations":
-                            formatted_sections.append(f"\n**{section}**")
-                            formatted_sections.append("- Please consult with a healthcare professional\n- Keep track of your symptoms\n- Follow proper health guidelines")
-                        elif section == "Medical Disclaimer":
-                            formatted_sections.append(f"\n**{section}**")
-                            formatted_sections.append("- This information is for general guidance only\n- Not a substitute for professional medical advice\n- Consult your healthcare provider for specific advice")
-                        elif section == "Next Steps":
-                            formatted_sections.append(f"\n**{section}**")
-                            formatted_sections.append("- Consider scheduling an appointment with your doctor\n- Document any specific concerns\n- Follow up with a healthcare professional as needed")
         
-        # Join sections with proper spacing
-        formatted_text = '\n\n'.join(formatted_sections)
+        # Ensure we have all required sections
+        formatted_output = []
+        
+        # Add Information or Symptoms section
+        if "Information" in sections:
+            formatted_output.append("**Information**")
+            formatted_output.extend(sections["Information"])
+        elif "Symptoms" in sections:
+            formatted_output.append("**Symptoms**")
+            formatted_output.extend(sections["Symptoms"])
+        else:
+            formatted_output.append("**Information**")
+            formatted_output.append("- Based on your query, here is what you should know")
+            formatted_output.append("- Please note this is general information only")
+        
+        # Add empty line
+        formatted_output.append("")
+        
+        # Add Recommendations section
+        if "Recommendations" in sections:
+            formatted_output.append("**Recommendations**")
+            formatted_output.extend(sections["Recommendations"])
+        else:
+            formatted_output.append("**Recommendations**")
+            formatted_output.append("- Please consult with a healthcare professional")
+            formatted_output.append("- Keep track of your symptoms")
+            formatted_output.append("- Follow proper health guidelines")
+        
+        # Add empty line
+        formatted_output.append("")
+        
+        # Add Medical Disclaimer section
+        if "Medical Disclaimer" in sections:
+            formatted_output.append("**Medical Disclaimer**")
+            formatted_output.extend(sections["Medical Disclaimer"])
+        else:
+            formatted_output.append("**Medical Disclaimer**")
+            formatted_output.append("- This information is for general guidance only")
+            formatted_output.append("- Not a substitute for professional medical advice")
+            formatted_output.append("- Consult your healthcare provider for specific advice")
+        
+        # Add empty line
+        formatted_output.append("")
+        
+        # Add Next Steps section
+        if "Next Steps" in sections:
+            formatted_output.append("**Next Steps**")
+            formatted_output.extend(sections["Next Steps"])
+        else:
+            formatted_output.append("**Next Steps**")
+            formatted_output.append("- Consider scheduling an appointment with your doctor")
+            formatted_output.append("- Document any specific concerns")
+            formatted_output.append("- Follow up with a healthcare professional as needed")
+        
+        # Join formatted sections with proper spacing
+        formatted_text = '\n'.join(formatted_output)
+        
+        # Log the number of sections to help with debugging
+        section_markers = ["**Information**", "**Symptoms**", "**Recommendations**", "**Medical Disclaimer**", "**Next Steps**"]
+        section_count = sum(formatted_text.count(marker) for marker in section_markers)
+        logger.info(f"Formatted response contains {section_count} section markers")
         
         return formatted_text
 
@@ -201,51 +284,50 @@ class MedicalChatbot:
             # First, get relevant medical knowledge from our AI agent
             medical_context = await self.ai_agent.process_query(query)
             
+            # Extract important keywords from the query
+            keywords = query.lower().split()
+            
             # Prepare the conversation history
             history_text = "\n".join(self.conversation_history[-5:]) if self.conversation_history else ""
+            
+            # Analyze if we have a specific medical condition or situation
+            medical_conditions = []
+            if any(word in query.lower() for word in ["broke", "broken", "fracture", "injured", "sprain"]):
+                medical_conditions.append("injury")
+            if any(word in query.lower() for word in ["gym", "workout", "exercise", "training"]):
+                medical_conditions.append("fitness-related")
+            if any(word in query.lower() for word in ["flu", "cold", "fever", "cough"]):
+                medical_conditions.append("illness")
+            if any(word in query.lower() for word in ["stress", "anxiety", "depression", "mental"]):
+                medical_conditions.append("mental health")
+            if any(word in query.lower() for word in ["diet", "nutrition", "food", "eating"]):
+                medical_conditions.append("nutrition")
+            
+            condition_context = ", ".join(medical_conditions) if medical_conditions else "general health"
             
             # Construct the prompt with medical context and system instructions
             prompt = f"""You are an advanced medical AI assistant powered by Google's Gemma model. Your role is to provide helpful, accurate, and empathetic medical information while maintaining appropriate medical disclaimers.
 
 Medical Context: {medical_context}
 
-Previous Conversation:
-{history_text}
+Query Category: {condition_context}
 
 User Query: {query}
 
-IMPORTANT FORMATTING INSTRUCTIONS:
-1. Structure your response with these exact sections in order:
-   **Information** or **Symptoms**
-   **Recommendations**
-   **Medical Disclaimer**
-   **Next Steps**
+Previous Conversation:
+{history_text}
 
-2. Format each section like this:
-   **Section Title**
-   - First bullet point
-   - Second bullet point
-   - Third bullet point
+IMPORTANT INSTRUCTIONS:
+1. Directly address the user's specific query about {condition_context}
+2. Use the medical context provided but adapt it to the user's specific situation
+3. Be factually accurate but also empathetic
+4. If the query mentions a specific injury or condition, prioritize that information
+5. Provide information, recommendations, and any necessary next steps
+6. DO NOT use any special formatting, markdown, or section headers in your response
+7. Simply provide the raw content as plain text paragraphs
+8. I will handle formatting your response appropriately
 
-3. Rules for formatting:
-   - Start each section with ** before and after the title
-   - Use a dash (-) at the start of each line within sections
-   - Add one blank line between sections
-   - Keep bullet points concise and clear
-   - Do not use any other formatting markers
-
-Example format:
-**Information**
-- First point about the condition
-- Second point about the condition
-- Third point about the condition
-
-**Recommendations**
-- First recommendation
-- Second recommendation
-- Third recommendation
-
-Please provide your response following this exact format."""
+Please write a helpful, informative response about {condition_context} that addresses the user's query."""
 
             # Call Ollama API with Gemma model
             response = requests.post(
@@ -267,8 +349,17 @@ Please provide your response following this exact format."""
                 result = response.json()
                 generated_response = result.get("response", "")
                 
-                # Format the response
-                formatted_response = self._format_response(generated_response)
+                # Check if the response already has formatting
+                contains_formatting = "**Information**" in generated_response or "**Symptoms**" in generated_response
+                
+                if contains_formatting:
+                    # If the model ignored our instructions and already formatted the response,
+                    # just extract the main content without re-formatting
+                    logger.info("Response already contains formatting, using as-is")
+                    formatted_response = generated_response
+                else:
+                    # Format the plain text response
+                    formatted_response = self._format_response(generated_response)
                 
                 # Update conversation history
                 self.conversation_history.append(f"User: {query}\nAssistant: {formatted_response}")
