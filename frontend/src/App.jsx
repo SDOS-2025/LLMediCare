@@ -9,12 +9,13 @@ import Appointments from './pages/Appointments2.jsx';
 import Records from './components/Records.jsx';
 import Login  from './pages/Login.jsx';
 import Profile from './pages/Profile.jsx';
+import DoctorDashboard from './pages/DoctorDashboard.jsx';
 import { auth } from './utils/firebase-config.js';
 import { onAuthStateChanged } from 'firebase/auth';
 import styled from 'styled-components';
 
 // Protected Route Component
-function ProtectedRoute({ element }) {
+function ProtectedRoute({ element, allowedRoles = [] }) {
   const location = useLocation();
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -28,11 +29,20 @@ function ProtectedRoute({ element }) {
     return () => unsubscribe();
   }, []);
 
-  if (loading) return null; // Avoid redirect flicker
+  if (loading) return null;
 
   if (!user) {
     alert('Log In required!');
     return <Navigate to="/" state={{ from: location }} replace />;
+  }
+
+  // Check if the route requires specific roles
+  if (allowedRoles.length > 0) {
+    const userRole = user.role || 'patient'; // Default to patient if role is not set
+    if (!allowedRoles.includes(userRole)) {
+      alert('You do not have permission to access this page!');
+      return <Navigate to="/" state={{ from: location }} replace />;
+    }
   }
 
   return element;
@@ -54,6 +64,7 @@ export default function App() {
                   <Route path="/appointments" element={<ProtectedRoute element={<Appointments />} />} />
                   <Route path="/records" element={<ProtectedRoute element={<Records />} />} />
                   <Route path="/profile" element={<ProtectedRoute element={<Profile />} />} />
+                  <Route path="/doctor-dashboard" element={<ProtectedRoute element={<DoctorDashboard />} allowedRoles={['doctor']} />} />
                 </Routes>
               </div>
             </MainContent>

@@ -13,6 +13,7 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [role, setRole] = useState("patient"); // Default role
   const navigate = useNavigate();
   const dispatch = useDispatch();
 
@@ -27,9 +28,13 @@ export default function Login() {
     try {
       await signInWithEmailAndPassword(auth, email, password);
       await dispatch(fetchUserDetails(email)).unwrap();
-
       setMessage(`Welcome!`);
-      navigate("/home");
+      // Redirect based on role
+      if (role === "doctor") {
+        navigate("/doctor-dashboard");
+      } else {
+        navigate("/home");
+      }
     } catch (error) {
       setMessage(`Error: ${error.message}`);
     }
@@ -52,7 +57,7 @@ export default function Login() {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       // const user = userCredential.user;
   
-      const userData = { name, email };
+      const userData = { name, email, role }; // Include role in user data
       await dispatch(createUser(userData)).unwrap();
   
       setMessage("Registration successful! Go to the Login tab to login.");
@@ -65,7 +70,7 @@ export default function Login() {
   return (
     <Container>
       <Content>
-        <AppTitle>Welcome</AppTitle>
+        <AppTitle>Welcome to LLMediCare</AppTitle>
         <div className="tabs">
           <button
             className={`tab ${activeTab === "login" ? "active" : ""}`}
@@ -89,6 +94,22 @@ export default function Login() {
         {message && <MessageBox className={message.includes("Error") ? "error" : "success"}>{message}</MessageBox>}
         {activeTab === "login" && (
           <form className="form" onSubmit={handleLoginSubmit}>
+            <RoleSelector>
+              <RoleOption
+                type="button"
+                className={role === "patient" ? "active" : ""}
+                onClick={() => setRole("patient")}
+              >
+                Patient
+              </RoleOption>
+              <RoleOption
+                type="button"
+                className={role === "doctor" ? "active" : ""}
+                onClick={() => setRole("doctor")}
+              >
+                Doctor
+              </RoleOption>
+            </RoleSelector>
             <InputField
               type="email"
               placeholder="Email"
@@ -108,6 +129,22 @@ export default function Login() {
         )}
         {activeTab === "signup" && (
           <form className="form" onSubmit={handleSignupSubmit}>
+            <RoleSelector>
+              <RoleOption
+                type="button"
+                className={role === "patient" ? "active" : ""}
+                onClick={() => setRole("patient")}
+              >
+                Patient
+              </RoleOption>
+              <RoleOption
+                type="button"
+                className={role === "doctor" ? "active" : ""}
+                onClick={() => setRole("doctor")}
+              >
+                Doctor
+              </RoleOption>
+            </RoleSelector>
             <InputField
               type="text"
               placeholder="Name"
@@ -272,5 +309,34 @@ const MessageBox = styled.div`
     background-color: #e8f5e9;
     color: #2e7d32;
     border: 1px solid #c8e6c9;
+  }
+`;
+
+const RoleSelector = styled.div`
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  justify-content: center;
+`;
+
+const RoleOption = styled.button`
+  padding: 0.5rem 1.5rem;
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  background: white;
+  color: #666;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover {
+    border-color: #3a86ff;
+    color: #3a86ff;
+  }
+
+  &.active {
+    background-color: #3a86ff;
+    color: white;
+    border-color: #3a86ff;
   }
 `;
