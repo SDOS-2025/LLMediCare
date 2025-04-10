@@ -44,6 +44,7 @@ import {
   setCurrentSession,
   clearMessages,
   addMessage,
+  removeMessage,
 } from "../store/slices/sessionSlice";
 import axios from "axios";
 
@@ -97,32 +98,49 @@ const MessageBubble = styled(Box)(({ theme, isUser }) => ({
   "&:hover": {
     transform: "translateY(-1px)",
   },
-  "& .MuiList-root": {
-    padding: 0,
-    marginTop: "8px",
-    marginBottom: "8px",
+  "& .markdown-content": {
+    fontFamily: "'Roboto', sans-serif",
+    width: "100%",
   },
-  "& .MuiListItem-root": {
-    display: "flex",
-    alignItems: "flex-start",
-    padding: "4px 0",
-    "&::before": {
-      content: '"•"',
-      color: isUser ? "#fff" : theme.palette.primary.main,
-      marginRight: "12px",
-      fontSize: "1.2rem",
-      lineHeight: 1.5,
-    },
-  },
-  "& .MuiTypography-h6": {
-    fontWeight: 600,
-    marginBottom: "12px",
+  "& h3": {
     color: isUser ? "#fff" : theme.palette.primary.main,
     fontSize: "1.1rem",
+    fontWeight: "600",
+    margin: "16px 0 8px 0",
     borderBottom: `1px solid ${
       isUser ? "rgba(255,255,255,0.2)" : "rgba(25,118,210,0.2)"
     }`,
-    paddingBottom: "8px",
+    paddingBottom: "4px",
+  },
+  "& ul, & ol": {
+    margin: "8px 0",
+    paddingLeft: "20px",
+  },
+  "& ul": {
+    listStyleType: "disc",
+  },
+  "& ol": {
+    listStyleType: "decimal",
+  },
+  "& li": {
+    margin: "4px 0",
+    display: "list-item",
+    paddingLeft: "4px",
+  },
+  "& li::marker": {
+    color: isUser ? "#fff" : theme.palette.primary.main,
+  },
+  "& ol > li": {
+    paddingLeft: "8px",
+  },
+  "& p": {
+    margin: "8px 0",
+  },
+  "& em": {
+    color: isUser ? "rgba(255,255,255,0.8)" : "rgba(0,0,0,0.6)",
+    fontStyle: "italic",
+    display: "block",
+    marginTop: "10px",
   },
 }));
 
@@ -146,56 +164,93 @@ const InputContainer = styled(Box)(({ theme }) => ({
 }));
 
 const formatResponse = (text) => {
-  // First, clean up any extra dashes and asterisks
-  let cleanText = text.replace(/--/g, "").replace(/\*\*\*\*/g, "**");
+  if (!text) return "";
 
-  // Split the response into sections
-  const sections = cleanText.split("**").filter((section) => section.trim());
-
-  return (
-    <Box sx={{ width: "100%" }}>
-      {sections.map((section, index) => {
-        if (index % 2 === 0) {
-          // This is a section header
-          return (
-            <Typography key={index} variant="h6" gutterBottom>
-              {section.trim()}
-            </Typography>
-          );
-        } else {
-          // This is content section
-          const lines = section
-            .split("\n")
-            .map((line) => line.trim())
-            .filter((line) => line);
-
-          return (
-            <List key={index} dense>
-              {lines.map((line, i) => {
-                // Remove any existing bullet points or dashes
-                const cleanLine = line.replace(/^[-•*]\s*/, "").trim();
-                return (
-                  <ListItem key={i}>
-                    <Typography
-                      variant="body1"
-                      sx={{
-                        fontSize: "0.95rem",
-                        lineHeight: 1.6,
-                        display: "block",
-                        width: "100%",
-                      }}
-                    >
-                      {cleanLine}
-                    </Typography>
-                  </ListItem>
-                );
-              })}
-            </List>
-          );
-        }
-      })}
-    </Box>
+  // Process markdown headings (e.g., ## Heading)
+  let formatted = text.replace(
+    /^##\s+(.+)$/gm,
+    '<h3 class="text-xl font-bold mt-4 mb-2">$1</h3>'
   );
+
+  // First detect if this is a numbered list
+  const hasNumberedList = /^\d+\.\s+.+$/gm.test(formatted);
+
+  // Format bullet points
+  formatted = formatted.replace(
+    /^-\s+(.+)$/gm,
+    '<li class="ml-5 mb-1">$1</li>'
+  );
+
+  // Wrap bullet lists in ul tags
+  formatted = formatted.replace(/<\/li>\n<li/g, "</li><li");
+  formatted = formatted.replace(
+    /(<li[^>]*>.*?<\/li>)/gs,
+    '<ul class="list-disc my-2">$1</ul>'
+  );
+
+  // Format numbered lists with proper sequential numbering
+  if (hasNumberedList) {
+    // Find all numbered list items
+    const listItems = [];
+    const numberPattern = /^(\d+)\.\s+(.+)$/gm;
+    let match;
+
+    // Extract all list items
+    while ((match = numberPattern.exec(formatted)) !== null) {
+      listItems.push({
+        number: parseInt(match[1]),
+        content: match[2],
+        originalText: match[0],
+      });
+    }
+
+    // Process all numbered list items
+    if (listItems.length > 0) {
+      // Create the HTML for ordered list
+      let olHtml = '<ol class="list-decimal my-2">';
+
+      listItems.forEach((item) => {
+        olHtml += `<li value="${item.number}" class="ml-5 mb-1">${item.content}</li>`;
+        // Replace the original text with a placeholder
+        formatted = formatted.replace(
+          item.originalText,
+          `__NUMBERED_LIST_ITEM_${item.number}__`
+        );
+      });
+
+      olHtml += "</ol>";
+
+      // Replace the first placeholder with the full ordered list
+      formatted = formatted.replace(
+        `__NUMBERED_LIST_ITEM_${listItems[0].number}__`,
+        olHtml
+      );
+
+      // Remove other placeholders
+      for (let i = 1; i < listItems.length; i++) {
+        formatted = formatted.replace(
+          `__NUMBERED_LIST_ITEM_${listItems[i].number}__`,
+          ""
+        );
+      }
+    }
+  }
+
+  // Make disclaimer text italicized
+  formatted = formatted.replace(
+    /\*([^*]+)\*/g,
+    '<em class="text-gray-600">$1</em>'
+  );
+
+  // Convert double newlines into paragraph breaks for better spacing
+  formatted = formatted.replace(/\n\n/g, '</p><p class="my-2">');
+
+  // Wrap in container and clean up empty paragraphs
+  formatted =
+    '<div class="markdown-content"><p class="my-2">' + formatted + "</p></div>";
+  formatted = formatted.replace(/<p class="my-2"><\/p>/g, "");
+
+  return formatted;
 };
 
 const Chatbot = () => {
@@ -219,6 +274,46 @@ const Chatbot = () => {
   const [selectedFile, setSelectedFile] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef(null);
+
+  // Add state to store medical report data
+  const [reportContext, setReportContext] = useState({
+    hasReport: false,
+    extractedText: "",
+    analysis: "",
+  });
+
+  // Add context reset tracking after initial state setup
+  const [contextRelevanceCounter, setContextRelevanceCounter] = useState(0);
+  const MAX_REPORT_RELEVANCE = 3; // After 3 questions, we'll stop including the report context automatically
+
+  // Function to determine if a new message is related to a previous medical report
+  const isRelatedToMedicalReport = (message) => {
+    const medicalReportKeywords = [
+      "report",
+      "scan",
+      "test",
+      "results",
+      "diagnosis",
+      "doctor",
+      "medical",
+      "hospital",
+      "treatment",
+      "cancer",
+      "tumor",
+      "medication",
+      "prescription",
+      "therapy",
+      "finding",
+      "condition",
+    ];
+
+    const messageLower = message.toLowerCase();
+
+    // Check if the message contains any medical report related keywords
+    return medicalReportKeywords.some((keyword) =>
+      messageLower.includes(keyword)
+    );
+  };
 
   // Load user's chat sessions when component mounts or when user changes
   useEffect(() => {
@@ -386,6 +481,34 @@ const Chatbot = () => {
         created_at: new Date().toISOString(),
       };
 
+      // Determine if we should include report context
+      const shouldIncludeReportContext =
+        reportContext.hasReport &&
+        (isRelatedToMedicalReport(userMessage) ||
+          contextRelevanceCounter < MAX_REPORT_RELEVANCE);
+
+      // Include report context if appropriate
+      if (shouldIncludeReportContext) {
+        messageData.context = {
+          report_text: reportContext.extractedText,
+          report_analysis: reportContext.analysis,
+          is_followup_question: true,
+        };
+        console.log(
+          "Including report context in message:",
+          messageData.context
+        );
+
+        // Increment the counter for context relevance tracking
+        setContextRelevanceCounter((prev) => prev + 1);
+      } else if (reportContext.hasReport) {
+        // If we have a report but didn't include it, reset the counter
+        console.log(
+          "Skipping report context for this message - topic appears unrelated"
+        );
+        setContextRelevanceCounter(0);
+      }
+
       console.log("Sending message with data:", messageData);
 
       try {
@@ -508,6 +631,22 @@ const Chatbot = () => {
     }
   };
 
+  // Add a function to reset the medical report context
+  const handleResetContext = () => {
+    setReportContext({
+      hasReport: false,
+      extractedText: "",
+      analysis: "",
+    });
+    setContextRelevanceCounter(0);
+
+    setSnackbar({
+      open: true,
+      message: "Medical report context has been cleared",
+      severity: "success",
+    });
+  };
+
   const handleNewChat = async () => {
     try {
       if (currentUser) {
@@ -522,6 +661,9 @@ const Chatbot = () => {
         // Clear messages for this new session
         setMessages([]);
         setInput("");
+
+        // Clear any existing report context
+        handleResetContext();
 
         // Get all sessions to update the sidebar
         dispatch(getUserSessions(currentUser.email));
@@ -729,21 +871,25 @@ const Chatbot = () => {
             headers: {
               "Content-Type": "multipart/form-data",
             },
-            timeout: 30000, // 30 second timeout
+            timeout: 120000, // Increase timeout to 120 seconds (2 minutes)
           }
         );
 
         console.log("Upload response:", response.data);
 
-        // Remove the loading message
-        dispatch({
-          type: "session/removeMessage",
-          payload: tempLoadingMessage.id,
-        });
+        // Remove the loading message - use the proper action
+        dispatch(removeMessage(tempLoadingMessage.id));
 
         if (response.data && response.data.success) {
           console.log("OCR analysis:", response.data.analysis);
           console.log("Current sessionId:", sessionId);
+
+          // Store the report data in context for future reference
+          setReportContext({
+            hasReport: true,
+            extractedText: response.data.extracted_text,
+            analysis: response.data.analysis,
+          });
 
           // Format the analysis in a readable way - create message object first
           const analysisMessage = {
@@ -816,24 +962,33 @@ const Chatbot = () => {
       } catch (uploadError) {
         console.error("Error during upload:", uploadError);
 
-        // Remove the loading message
-        dispatch({
-          type: "session/removeMessage",
-          payload: tempLoadingMessage.id,
-        });
+        // Remove the loading message - use the proper action
+        dispatch(removeMessage(tempLoadingMessage.id));
 
         // Add more detailed error message
-        const uploadErrorDetail =
-          uploadError.response?.data?.error ||
-          (uploadError.message === "Network Error"
-            ? "Backend server may not be running. Please check your server connection."
-            : uploadError.message);
+        let errorDetail = "An unknown error occurred";
+
+        if (uploadError.response) {
+          // Server responded with an error
+          errorDetail =
+            uploadError.response.data?.error ||
+            `Server error: ${uploadError.response.status}`;
+        } else if (uploadError.code === "ECONNABORTED") {
+          // Timeout error
+          errorDetail =
+            "The request timed out. The image may be too large or complex for processing. Try using a clearer or smaller image.";
+        } else if (uploadError.message === "Network Error") {
+          errorDetail =
+            "Backend server may not be running. Please check your server connection.";
+        } else {
+          errorDetail = uploadError.message;
+        }
 
         const errorMessage = {
           id: Date.now() + 2,
           session_id: sessionId,
           sender: "assistant",
-          message: `I encountered an error while processing your medical report: ${uploadErrorDetail}. This could be because Tesseract OCR is not properly installed on the server.`,
+          message: `I encountered an error while processing your medical report: ${errorDetail}`,
           created_at: new Date().toISOString(),
         };
 
@@ -846,7 +1001,7 @@ const Chatbot = () => {
 
         setSnackbar({
           open: true,
-          message: uploadErrorDetail || "Error processing medical report",
+          message: errorDetail,
           severity: "error",
         });
       }
@@ -884,6 +1039,35 @@ const Chatbot = () => {
 
   return (
     <Container maxWidth="md" sx={{ mt: 4, mb: 4 }}>
+      {reportContext.hasReport && (
+        <Box
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            backgroundColor: "rgba(25, 118, 210, 0.1)",
+            padding: "8px 16px",
+            borderRadius: "8px",
+            marginBottom: "12px",
+            gap: 1,
+          }}
+        >
+          <DescriptionIcon color="primary" fontSize="small" />
+          <Typography variant="body2" color="primary.main">
+            Medical report context is active - your questions will be answered
+            in relation to your uploaded report
+          </Typography>
+          <Button
+            size="small"
+            variant="outlined"
+            onClick={handleResetContext}
+            sx={{ ml: 2, minWidth: "auto", padding: "2px 8px" }}
+          >
+            Clear
+          </Button>
+        </Box>
+      )}
+
       <ChatContainer elevation={3}>
         <Box
           sx={{
@@ -913,6 +1097,24 @@ const Chatbot = () => {
             </Typography>
           </Box>
           <Box sx={{ display: "flex", gap: 1 }}>
+            {reportContext.hasReport && (
+              <Tooltip title="Clear Medical Report Context">
+                <IconButton
+                  color="inherit"
+                  onClick={handleResetContext}
+                  disabled={loading}
+                  aria-label="Clear Context"
+                  sx={{
+                    transition: "transform 0.2s ease",
+                    "&:hover": {
+                      transform: "scale(1.1)",
+                    },
+                  }}
+                >
+                  <DescriptionIcon />
+                </IconButton>
+              </Tooltip>
+            )}
             <Tooltip title="New Chat">
               <IconButton
                 color="inherit"
@@ -1169,7 +1371,12 @@ const Chatbot = () => {
                       {message.isUser ? (
                         <Typography>{message.text}</Typography>
                       ) : (
-                        formatResponse(message.text)
+                        <Box
+                          dangerouslySetInnerHTML={{
+                            __html: formatResponse(message.text),
+                          }}
+                          sx={{ width: "100%" }}
+                        />
                       )}
                     </MessageBubble>
                     {message.isUser && (

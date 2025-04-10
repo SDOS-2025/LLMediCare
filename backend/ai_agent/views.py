@@ -66,6 +66,7 @@ def process_query(request):
         
     try:
         query = request.data.get('query')
+        # Extract context if provided (for report follow-up questions)
         context = request.data.get('context', {})
         
         if not query:
@@ -84,7 +85,11 @@ def process_query(request):
         user_id = get_user_id(request)
         chatbot = get_chatbot_for_user(user_id)
         
-        logger.info(f"Processing query for user {user_id}: {query[:50]}...")
+        # Log whether this is a follow-up question about a medical report
+        if context and context.get('is_followup_question') and (context.get('report_text') or context.get('report_analysis')):
+            logger.info(f"Processing report follow-up query for user {user_id}: {query[:50]}...")
+        else:
+            logger.info(f"Processing general query for user {user_id}: {query[:50]}...")
         
         try:
             # Run the async function in the event loop
@@ -352,16 +357,35 @@ def process_medical_report(request):
         # Read file contents
         file_bytes = uploaded_file.read()
         
+        # Check image size
+        if len(file_bytes) > 10 * 1024 * 1024:  # 10MB limit
+            error_response = Response(
+                {'success': False, 'error': 'Image file is too large (max 10MB). Please upload a smaller image.'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+            return add_cors_headers(error_response)
+            
         # Get the chatbot instance for this user
         chatbot = get_chatbot_for_user(user_id)
         
         logger.info(f"Processing medical report image for user {user_id}, file size: {len(file_bytes)} bytes")
         
-        # Process the image with OCR
+        # Process the image with OCR with a timeout
         try:
-            result = asyncio.run(chatbot.process_medical_image(file_bytes))
+            # Create a timeout using asyncio
+            result = None
+            try:
+                # Run with a 90-second timeout
+                result = asyncio.run(asyncio.wait_for(chatbot.process_medical_image(file_bytes), timeout=90.0))
+            except asyncio.TimeoutError:
+                logger.error("OCR processing timed out after 90 seconds")
+                error_response = Response(
+                    {'success': False, 'error': 'OCR processing timed out. The image may be too complex or Tesseract OCR may be too slow. Try using a clearer or simpler image.'}, 
+                    status=status.HTTP_408_REQUEST_TIMEOUT
+                )
+                return add_cors_headers(error_response)
             
-            if not result["success"]:
+            if not result or not result.get("success", False):
                 error_response = Response(
                     {'success': False, 'error': result.get('error', 'Failed to process image')}, 
                     status=status.HTTP_400_BAD_REQUEST

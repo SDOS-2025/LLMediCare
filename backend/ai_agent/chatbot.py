@@ -14,6 +14,7 @@ import numpy as np
 import io
 import base64
 import sys
+import re
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -175,8 +176,8 @@ class MedicalChatbot:
 
     def _format_response(self, text: str) -> str:
         """
-        Apply lightweight formatting to the model's response
-        This preserves the natural flow of the text while making it slightly more readable
+        Apply formatting to the model's response to make it more structured and readable
+        with bullet points and proper section formatting
         """
         # Remove any extra whitespace
         text = text.strip()
@@ -185,19 +186,116 @@ class MedicalChatbot:
         if not text:
             return "I apologize, but I couldn't generate a proper response. Please try asking your question again."
         
-        # Split the text into paragraphs
-        paragraphs = [p.strip() for p in text.split('\n') if p.strip()]
+        # Format the response with Markdown styling for better visual appearance
+        formatted_text = text
         
-        formatted_paragraphs = []
-        for i, paragraph in enumerate(paragraphs):
-            # Keep the paragraph as is, preserving its natural structure
-            formatted_paragraphs.append(paragraph)
+        # Ensure section headers use proper Markdown format
+        # Replace any headers that don't use ## format
+        header_patterns = [
+            (r'(?im)^(summary|overview)[:]\s*$', '## Summary\n'),
+            (r'(?im)^(symptoms|signs)[:]\s*$', '## Symptoms\n'),
+            (r'(?im)^(diagnosis|condition|disease)[:]\s*$', '## Diagnosis\n'),
+            (r'(?im)^(treatment|therapy|management)[:]\s*$', '## Treatment\n'),
+            (r'(?im)^(medications|prescription|drug)[:]\s*$', '## Medications\n'),
+            (r'(?im)^(recommendations|advice|suggestions)[:]\s*$', '## Recommendations\n'),
+            (r'(?im)^(prevention|precautions)[:]\s*$', '## Prevention\n'),
+            (r'(?im)^(warnings|cautions|alerts)[:]\s*$', '## Important Warnings\n'),
+            (r'(?im)^(follow.?up|next.?steps)[:]\s*$', '## Follow-up Steps\n'),
+            (r'(?im)^(key medical findings)[:]\s*$', '## Key Medical Findings\n'),
+            (r'(?im)^(report summary)[:]\s*$', '## Report Summary\n'),
+            (r'(?im)^(diagnosed conditions)[:]\s*$', '## Diagnosed Conditions\n')
+        ]
         
-        # Join the paragraphs with double newlines for better readability
-        formatted_text = '\n\n'.join(formatted_paragraphs)
+        # Process each section pattern
+        for pattern, replacement in header_patterns:
+            formatted_text = re.sub(pattern, replacement, formatted_text)
         
-        # Log the final length for debugging
-        logger.debug(f"Formatted response length: {len(formatted_text)} characters")
+        # Process each line
+        lines = formatted_text.split('\n')
+        formatted_lines = []
+        in_list = False
+        in_numbered_list = False
+        expected_next_number = 1
+        
+        for i, line in enumerate(lines):
+            line = line.strip()
+            if not line:
+                # Keep paragraph breaks
+                formatted_lines.append('')
+                in_list = False
+                in_numbered_list = False
+                expected_next_number = 1
+                continue
+            
+            # Check if this line is already a properly formatted section header (## Header)
+            if re.match(r'^##\s+.+', line):
+                # Add spacing before headers (except the first one)
+                if i > 0 and formatted_lines and formatted_lines[-1] != '':
+                    formatted_lines.append('')
+                
+                formatted_lines.append(line)
+                in_list = False
+                in_numbered_list = False
+                expected_next_number = 1
+                continue
+            
+            # Check if this is a numbered list item
+            numbered_match = re.match(r'^(\d+)\.?\s+(.+)', line)
+            if numbered_match:
+                number = int(numbered_match.group(1))
+                content = numbered_match.group(2)
+                
+                # Ensure proper sequential numbering
+                if not in_numbered_list or number == expected_next_number:
+                    formatted_lines.append(f"{number}. {content}")
+                    in_numbered_list = True
+                    expected_next_number = number + 1
+                else:
+                    # If the number doesn't match what we expect, force the correct number
+                    formatted_lines.append(f"{expected_next_number}. {content}")
+                    expected_next_number += 1
+                
+                in_list = False
+                continue
+                
+            # Check if this is a bullet list item
+            if re.match(r'^[-*•]\s+.+', line):
+                # Format existing bullet points consistently
+                if line.startswith('•') or line.startswith('*'):
+                    line = '- ' + line[1:].lstrip()
+                formatted_lines.append(line)
+                in_list = True
+                in_numbered_list = False
+                expected_next_number = 1
+                continue
+                
+            # Format short phrases as bullet points if they're not already
+            elif len(line) < 100 and not line.endswith('.') and not re.match(r'^[A-Z].*[\.\?!]$', line):
+                # Convert to a list item if it's not a complete sentence
+                formatted_lines.append(f"- {line}")
+                in_list = True
+                in_numbered_list = False
+                expected_next_number = 1
+                continue
+            
+            # Regular paragraph text
+            formatted_lines.append(line)
+            in_list = False
+            in_numbered_list = False
+            expected_next_number = 1
+        
+        # Join the lines back together
+        formatted_text = '\n'.join(formatted_lines)
+        
+        # Add a disclaimer if not already present
+        if "disclaimer" not in formatted_text.lower() and "note:" not in formatted_text.lower():
+            formatted_text += "\n\n*Disclaimer: This information is provided for educational purposes only and should not replace professional medical advice.*"
+        
+        # Ensure consistent spacing between sections
+        # Replace multiple consecutive newlines with just two
+        formatted_text = re.sub(r'\n{3,}', '\n\n', formatted_text)
+        
+        logger.info(f"Formatted response with improved styling, length: {len(formatted_text)} characters")
         
         return formatted_text
 
@@ -298,9 +396,24 @@ class MedicalChatbot:
             # Log image details
             logger.info(f"Image format: {image.format}, size: {image.size}, mode: {image.mode}")
             
-            # Preprocess the image if needed (for better OCR results)
-            # Convert to grayscale
+            # Optimize image for OCR processing
+            # Resize large images to speed up processing
+            max_dimension = 2000  # Maximum width or height
+            if max(image.size) > max_dimension:
+                # Calculate new dimensions while preserving aspect ratio
+                ratio = max_dimension / max(image.size)
+                new_size = (int(image.size[0] * ratio), int(image.size[1] * ratio))
+                image = image.resize(new_size, Image.LANCZOS)
+                logger.info(f"Resized image to {new_size} for faster processing")
+            
+            # Convert to grayscale for better OCR
             image = image.convert('L')
+            
+            # Improve contrast using histogram equalization
+            img_array = np.array(image)
+            # Simple contrast enhancement
+            img_array = ((img_array - img_array.min()) / (img_array.max() - img_array.min()) * 255).astype(np.uint8)
+            image = Image.fromarray(img_array)
             
             # Verify Tesseract is installed
             try:
@@ -313,9 +426,12 @@ class MedicalChatbot:
                     "error": "Tesseract OCR is not properly installed. Please ensure Tesseract is installed and configured correctly."
                 }
             
-            # Extract text using OCR
+            # Extract text using OCR with optimized settings
             try:
-                extracted_text = pytesseract.image_to_string(image)
+                # Use optimized OCR configuration
+                custom_config = r'--oem 3 --psm 6 -l eng'  # Optimized settings for text documents
+                logger.info("Starting OCR extraction with optimized settings...")
+                extracted_text = pytesseract.image_to_string(image, config=custom_config)
                 logger.info(f"OCR extraction completed: {len(extracted_text)} characters extracted")
             except Exception as e:
                 logger.error(f"OCR extraction failed: {str(e)}")
@@ -399,6 +515,30 @@ class MedicalChatbot:
             if context is None:
                 context = {}
                 
+            # Determine if this is a follow-up question related to a medical report
+            is_followup_question = context.get('is_followup_question', False)
+            has_report_context = context.get('report_text') or context.get('report_analysis')
+            
+            # Check if the query appears unrelated to the medical report context
+            # This helps avoid forcing all responses to be about the medical report
+            if is_followup_question and has_report_context:
+                # Check if the query appears to be about a completely different topic
+                medical_keywords = [
+                    "report", "scan", "test", "results", "diagnosis", "doctor", 
+                    "medical", "hospital", "treatment", "cancer", "tumor", "medication",
+                    "prescription", "therapy", "doctor", "health", "symptom"
+                ]
+                
+                # Simple heuristic to check if query is likely unrelated to the report
+                query_lower = query.lower()
+                contains_medical_term = any(keyword in query_lower for keyword in medical_keywords)
+                
+                # If the query seems completely unrelated, don't treat it as a follow-up
+                if not contains_medical_term and len(query.split()) > 3:
+                    logger.info("Query appears unrelated to medical report context - responding as general query")
+                    # Clear the context for this specific query to avoid forcing a medical report response
+                    is_followup_question = False
+                    
             # Get additional knowledge if necessary
             knowledge_info = await self._get_additional_knowledge(query)
             
@@ -410,7 +550,8 @@ class MedicalChatbot:
             prompt = (
                 "You are a friendly and helpful medical assistant named MediCare. "
                 "Your goal is to provide helpful medical information in a warm, conversational manner. "
-                "Always respond naturally like a real healthcare professional would in a conversation. "
+                "You should structure your responses with clear section headings (using ## for main sections) and bullet points (using -) for better readability. "
+                "Always organize information into categories and present them in a structured format. "
                 "Avoid using technical medical terminology unless necessary, and explain any medical terms "
                 "you use in simple language. Show empathy and understanding in your responses.\n\n"
                 f"User's question: {query}\n\n"
@@ -428,38 +569,61 @@ class MedicalChatbot:
                     prompt += f"- {key}: {value}\n"
                 prompt += "\n"
                 
-            if context.get('report_text'):
-                prompt += f"Medical Report to Summarize:\n{context.get('report_text')}\n\n"
+            # Include medical report context only when it's relevant to the current question
+            if context.get('report_text') and is_followup_question:
+                prompt += "Previously Uploaded Medical Report Text:\n"
+                prompt += f"{context.get('report_text')}\n\n"
                 
-            if context.get('report_analysis'):
-                prompt += f"Medical Report Analysis:\n{context.get('report_analysis')}\n\n"
-                prompt += "Based on this medical report, provide a helpful response addressing any concerns, explaining the findings, and suggesting appropriate next steps.\n\n"
+            if context.get('report_analysis') and is_followup_question:
+                prompt += "Previous Analysis of the Medical Report:\n"
+                prompt += f"{context.get('report_analysis')}\n\n"
+                prompt += (
+                    "The user is asking a follow-up question that may be related to their medical report. "
+                    "If their question is clearly about the report, reference specific information from it. "
+                    "If their question seems unrelated to the report (like a general medical question), "
+                    "answer it normally without forcing connections to the report.\n\n"
+                )
             
             # Add conversation guidance
             prompt += (
                 "Guidelines for your response:\n"
-                "1. Be conversational and natural - respond as if you're having a chat\n"
-                "2. Use a warm, friendly tone that builds trust\n"
-                "3. Provide accurate information in a helpful way\n"
-                "4. Address the user's specific concerns directly\n"
-                "5. Use simple language and explain any medical terms\n"
-                "6. Include a brief note that this is informational and not a replacement for professional medical advice\n"
+                "1. Structure your response with clear section headings (## Section Name)\n"
+                "2. Use bullet points (- ) for each key point to improve readability\n"
+                "3. If you need to use numbered lists, start from 1 and use sequential numbers (1, 2, 3...)\n"
+                "4. Group related information under appropriate sections\n" 
+                "5. Provide accurate information in a helpful way\n"
+                "6. Address the user's specific concerns directly\n"
+                "7. Use simple language and explain any medical terms\n"
+                "8. Keep your tone conversational and warm despite the structured format\n"
+                "9. Include a disclaimer that this is informational and not a replacement for professional medical advice\n"
+            )
+            
+            # Add section format examples
+            prompt += (
+                "Format examples - use formats like these as appropriate for your response:\n"
+                "## Summary\n"
+                "- Key point 1\n"
+                "- Key point 2\n\n"
+                "## Recommendations\n"
+                "1. First recommendation\n"
+                "2. Second recommendation\n"
+                "3. Third recommendation\n\n"
             )
             
             # Add specific questions about symptoms if relevant
             if should_ask_about_symptoms:
-                prompt += "7. Ask follow-up questions about their symptoms if appropriate\n"
+                prompt += "9. Ask follow-up questions about their symptoms\n"
                 
             # Add specific questions about medication if relevant
             if should_ask_about_medication:
-                prompt += "7. Ask follow-up questions about their current medications if appropriate\n"
+                prompt += "9. Ask follow-up questions about their current medications\n"
             
             # Get the raw response from the model
             logger.info(f"Sending prompt to LLM model. Prompt length: {len(prompt)} characters")
             raw_response = await self.llm_model.generate_text(prompt)
             logger.info(f"Received raw response. Length: {len(raw_response)} characters")
             
-            # Apply minimal formatting to preserve natural conversation flow
+            # Apply formatting to preserve natural conversation flow while improving structure
             formatted_response = self._format_response(raw_response)
             
             return formatted_response

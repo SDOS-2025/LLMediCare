@@ -69,11 +69,20 @@ export const sendUserInput = createAsyncThunk(
         // Continue even if this fails to try to get an AI response
       }
 
-      // Then get the AI response
-      console.log("Calling AI endpoint with query:", inputText.message);
-      const response = await axios.post(`${API_BASE1}/chat/`, {
+      // Prepare API request data - include context if provided
+      const requestData = {
         query: inputText.message,
-      });
+      };
+
+      // Add context data if it exists (for medical report follow-up questions)
+      if (inputText.context) {
+        console.log("Including context in API request:", inputText.context);
+        requestData.context = inputText.context;
+      }
+
+      // Then get the AI response
+      console.log("Calling AI endpoint with data:", requestData);
+      const response = await axios.post(`${API_BASE1}/chat/`, requestData);
 
       console.log("Got AI response:", response.data);
 
@@ -331,18 +340,22 @@ export const clearAllStoredSessions = () => {
   try {
     // Get all keys from localStorage
     const keys = Object.keys(localStorage);
-    
+
     // Find and remove all session-related keys
-    keys.forEach(key => {
-      if (key.startsWith('chat_history_') || key.startsWith('user_sessions_') || key.startsWith('current_session')) {
+    keys.forEach((key) => {
+      if (
+        key.startsWith("chat_history_") ||
+        key.startsWith("user_sessions_") ||
+        key.startsWith("current_session")
+      ) {
         localStorage.removeItem(key);
       }
     });
-    
-    console.log('All localStorage session data cleared');
+
+    console.log("All localStorage session data cleared");
     return true;
   } catch (error) {
-    console.error('Error clearing localStorage:', error);
+    console.error("Error clearing localStorage:", error);
     return false;
   }
 };
@@ -367,6 +380,15 @@ export const sessionSlice = createSlice({
     },
     addMessage: (state, action) => {
       state.messages.push(action.payload);
+      if (state.currentSession?.user_id) {
+        saveChatHistory(state.currentSession.user_id, state.messages);
+      }
+    },
+    removeMessage: (state, action) => {
+      // Remove a message by ID
+      state.messages = state.messages.filter(
+        (message) => message.id !== action.payload
+      );
       if (state.currentSession?.user_id) {
         saveChatHistory(state.currentSession.user_id, state.messages);
       }
@@ -501,6 +523,7 @@ export const {
   clearSession,
   setCurrentSession,
   addMessage,
+  removeMessage,
   clearMessages,
   clearAllLocalStorage,
 } = sessionSlice.actions;
