@@ -7,10 +7,65 @@ import os
 from pathlib import Path
 import pickle
 import traceback
+import asyncio
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+class OllamaModel:
+    """Wrapper for Ollama API to provide a consistent interface for text generation"""
+    def __init__(self, base_url, model_name):
+        self.base_url = base_url
+        self.model_name = model_name
+        self.available = self.test_connection()
+        if self.available:
+            logger.info(f"Initialized OllamaModel with model: {model_name}")
+        else:
+            logger.error(f"Failed to initialize OllamaModel: Ollama service not available at {base_url}")
+        
+    def test_connection(self) -> bool:
+        """Test if Ollama API is available"""
+        try:
+            response = requests.get(f"{self.base_url}/tags", timeout=5)
+            return response.status_code == 200
+        except Exception as e:
+            logger.error(f"Error connecting to Ollama API: {str(e)}")
+            return False
+        
+    async def generate_text(self, prompt: str) -> str:
+        """Generate text using the Ollama API"""
+        try:
+            if not self.available:
+                return "I apologize, but the AI service is currently unavailable. Please try again later."
+                
+            logger.info(f"Generating text with model: {self.model_name}")
+            response = requests.post(
+                f"{self.base_url}/generate",
+                json={
+                    "model": self.model_name,
+                    "prompt": prompt,
+                    "stream": False,
+                    "options": {
+                        "temperature": 0.7,
+                        "top_p": 0.9,
+                        "top_k": 40,
+                        "num_predict": 2048,
+                    }
+                }
+            )
+            
+            if response.status_code != 200:
+                logger.error(f"Error from Ollama API: {response.status_code} - {response.text}")
+                return "I apologize, but I'm having trouble processing your request right now."
+                
+            result = response.json()
+            return result.get("response", "")
+            
+        except Exception as e:
+            logger.error(f"Error generating text: {str(e)}")
+            logger.error(traceback.format_exc())
+            return "Sorry, I encountered an error while generating a response."
 
 class MedicalChatbot:
     def __init__(self):
@@ -26,6 +81,9 @@ class MedicalChatbot:
         
         # Initialize Gemma model
         self._initialize_gemma()
+        
+        # Initialize the LLM model interface
+        self.llm_model = OllamaModel(self.base_url, self.model)
 
     def _initialize_gemma(self):
         """Initialize the Gemma model using Ollama"""
@@ -87,171 +145,31 @@ class MedicalChatbot:
             logger.error(traceback.format_exc())
             return False
 
-    def _format_response(self, text):
-        """Format the response with proper markdown-style formatting"""
-        # Clean up the text first
+    def _format_response(self, text: str) -> str:
+        """
+        Apply lightweight formatting to the model's response
+        This preserves the natural flow of the text while making it slightly more readable
+        """
+        # Remove any extra whitespace
         text = text.strip()
         
-        # Check if the text already has proper formatting
-        if (text.count("**Information**") == 1 or text.count("**Symptoms**") == 1) and \
-           text.count("**Recommendations**") == 1 and \
-           text.count("**Medical Disclaimer**") == 1 and \
-           text.count("**Next Steps**") == 1:
-            # Text already has the correct sections, just return as is
-            logger.info("Response already has correct formatting, using as-is")
-            return text
+        # If the text is empty, return a default message
+        if not text:
+            return "I apologize, but I couldn't generate a proper response. Please try asking your question again."
         
-        # Initialize formatted sections
-        sections = {}
-        current_section = None
-        current_content = []
+        # Split the text into paragraphs
+        paragraphs = [p.strip() for p in text.split('\n') if p.strip()]
         
-        # Define the expected sections in order
-        expected_sections = ["Information", "Symptoms", "Recommendations", "Medical Disclaimer", "Next Steps"]
+        formatted_paragraphs = []
+        for i, paragraph in enumerate(paragraphs):
+            # Keep the paragraph as is, preserving its natural structure
+            formatted_paragraphs.append(paragraph)
         
-        # First, check if there are any existing section headers
-        has_section_headers = any(f"**{section}**" in text for section in expected_sections)
+        # Join the paragraphs with double newlines for better readability
+        formatted_text = '\n\n'.join(formatted_paragraphs)
         
-        if has_section_headers:
-            # Parse existing sections
-            lines = text.split('\n')
-            
-            # Process each line to identify sections and content
-            for line in lines:
-                line = line.strip()
-                if not line:
-                    continue
-                
-                # Check if this is a section header
-                if line.startswith('**') and line.endswith('**'):
-                    # If we have a previous section, add it to sections
-                    if current_section and current_content:
-                        sections[current_section] = current_content
-                    
-                    # Extract new section name
-                    section_name = line.replace('**', '').strip()
-                    current_section = section_name
-                    current_content = []
-                else:
-                    # Format content line with bullet point if missing
-                    line = line.lstrip('•-*').strip()
-                    if line and not line.startswith('-'):
-                        line = f"- {line}"
-                    if line:  # Only add non-empty lines
-                        current_content.append(line)
-            
-            # Add the last section if exists
-            if current_section and current_content:
-                sections[current_section] = current_content
-        else:
-            # No sections found, split content into informational paragraphs
-            paragraphs = text.split('\n\n')
-            
-            # Assign paragraphs to appropriate sections
-            # First paragraph is usually information
-            if paragraphs:
-                info_text = paragraphs[0]
-                info_lines = []
-                for line in info_text.split('\n'):
-                    line = line.strip()
-                    if line:
-                        info_lines.append(f"- {line}")
-                sections["Information"] = info_lines
-            
-            # If there are more paragraphs, use them for recommendations and next steps
-            if len(paragraphs) > 1:
-                rec_text = paragraphs[1]
-                rec_lines = []
-                for line in rec_text.split('\n'):
-                    line = line.strip()
-                    if line:
-                        rec_lines.append(f"- {line}")
-                sections["Recommendations"] = rec_lines
-            
-            # Add standard medical disclaimer
-            sections["Medical Disclaimer"] = [
-                "- This information is for general guidance only",
-                "- Not a substitute for professional medical advice",
-                "- Consult your healthcare provider for specific advice"
-            ]
-            
-            # Add next steps if available, otherwise use default
-            if len(paragraphs) > 2:
-                next_text = paragraphs[2]
-                next_lines = []
-                for line in next_text.split('\n'):
-                    line = line.strip()
-                    if line:
-                        next_lines.append(f"- {line}")
-                sections["Next Steps"] = next_lines
-            else:
-                sections["Next Steps"] = [
-                    "- Consider scheduling an appointment with your doctor",
-                    "- Document any specific concerns",
-                    "- Follow up with a healthcare professional as needed"
-                ]
-        
-        # Ensure we have all required sections
-        formatted_output = []
-        
-        # Add Information or Symptoms section
-        if "Information" in sections:
-            formatted_output.append("**Information**")
-            formatted_output.extend(sections["Information"])
-        elif "Symptoms" in sections:
-            formatted_output.append("**Symptoms**")
-            formatted_output.extend(sections["Symptoms"])
-        else:
-            formatted_output.append("**Information**")
-            formatted_output.append("- Based on your query, here is what you should know")
-            formatted_output.append("- Please note this is general information only")
-        
-        # Add empty line
-        formatted_output.append("")
-        
-        # Add Recommendations section
-        if "Recommendations" in sections:
-            formatted_output.append("**Recommendations**")
-            formatted_output.extend(sections["Recommendations"])
-        else:
-            formatted_output.append("**Recommendations**")
-            formatted_output.append("- Please consult with a healthcare professional")
-            formatted_output.append("- Keep track of your symptoms")
-            formatted_output.append("- Follow proper health guidelines")
-        
-        # Add empty line
-        formatted_output.append("")
-        
-        # Add Medical Disclaimer section
-        if "Medical Disclaimer" in sections:
-            formatted_output.append("**Medical Disclaimer**")
-            formatted_output.extend(sections["Medical Disclaimer"])
-        else:
-            formatted_output.append("**Medical Disclaimer**")
-            formatted_output.append("- This information is for general guidance only")
-            formatted_output.append("- Not a substitute for professional medical advice")
-            formatted_output.append("- Consult your healthcare provider for specific advice")
-        
-        # Add empty line
-        formatted_output.append("")
-        
-        # Add Next Steps section
-        if "Next Steps" in sections:
-            formatted_output.append("**Next Steps**")
-            formatted_output.extend(sections["Next Steps"])
-        else:
-            formatted_output.append("**Next Steps**")
-            formatted_output.append("- Consider scheduling an appointment with your doctor")
-            formatted_output.append("- Document any specific concerns")
-            formatted_output.append("- Follow up with a healthcare professional as needed")
-        
-        # Join formatted sections with proper spacing
-        formatted_text = '\n'.join(formatted_output)
-        
-        # Log the number of sections to help with debugging
-        section_markers = ["**Information**", "**Symptoms**", "**Recommendations**", "**Medical Disclaimer**", "**Next Steps**"]
-        section_count = sum(formatted_text.count(marker) for marker in section_markers)
-        logger.info(f"Formatted response contains {section_count} section markers")
+        # Log the final length for debugging
+        logger.debug(f"Formatted response length: {len(formatted_text)} characters")
         
         return formatted_text
 
@@ -276,122 +194,140 @@ class MedicalChatbot:
             
         return '\n'.join(formatted_lines)
 
-    async def generate_response(self, query: str, context: Optional[Dict] = None) -> str:
+    def _should_ask_about_symptoms(self, query: str) -> bool:
         """
-        Generate a response using Gemma model with medical context awareness
+        Determine if we should prompt the user for more symptom information
+        """
+        query_lower = query.lower()
+        symptom_keywords = [
+            "symptom", "feel", "sick", "pain", "ache", "hurt", "discomfort", 
+            "sore", "unwell", "ill", "suffering", "not feeling", "condition"
+        ]
+        
+        # Check if query contains symptom-related terms but is vague
+        has_symptom_terms = any(keyword in query_lower for keyword in symptom_keywords)
+        
+        # Determine if query is short/vague (simple heuristic)
+        is_vague = len(query.split()) < 10
+        
+        return has_symptom_terms and is_vague
+        
+    def _should_ask_about_medication(self, query: str) -> bool:
+        """
+        Determine if we should prompt the user for more medication information
+        """
+        query_lower = query.lower()
+        medication_keywords = [
+            "medicine", "medication", "drug", "pill", "prescription", "dose", 
+            "taking", "take", "prescribed", "pharmacy", "treatment", "side effect"
+        ]
+        
+        # Check if query mentions medications but is missing specifics
+        has_medication_terms = any(keyword in query_lower for keyword in medication_keywords)
+        
+        # Check if query is likely asking about drug interactions or side effects
+        is_interaction_query = "interact" in query_lower or "side effect" in query_lower
+        
+        return has_medication_terms and not is_interaction_query
+        
+    async def _get_additional_knowledge(self, query: str) -> str:
+        """
+        Retrieve additional medical knowledge relevant to the query
         """
         try:
-            # First, get relevant medical knowledge from our AI agent
-            medical_context = await self.ai_agent.process_query(query)
+            # Use the AI agent to retrieve relevant knowledge
+            knowledge = await self.ai_agent.process_query(query)
             
-            # Extract important keywords from the query
-            keywords = query.lower().split()
+            # If knowledge is empty or None, return an empty string
+            if not knowledge:
+                logger.debug("No additional knowledge retrieved")
+                return ""
+                
+            logger.info(f"Retrieved additional knowledge, length: {len(knowledge)} characters")
+            return knowledge
             
-            # Prepare the conversation history
-            history_text = "\n".join(self.conversation_history[-5:]) if self.conversation_history else ""
+        except Exception as e:
+            logger.error(f"Error retrieving additional knowledge: {str(e)}", exc_info=True)
+            return ""
+
+    async def generate_response(self, query: str, context: Dict = None) -> str:
+        """
+        Generate a conversational response to the user's query
+        
+        Args:
+            query: The user's query
+            context: Optional context information such as appointment details or medical records
+        """
+        try:
+            # Default context to empty dict if None
+            if context is None:
+                context = {}
+                
+            # Get additional knowledge if necessary
+            knowledge_info = await self._get_additional_knowledge(query)
             
-            # Analyze if we have a specific medical condition or situation
-            medical_conditions = []
-            if any(word in query.lower() for word in ["broke", "broken", "fracture", "injured", "sprain"]):
-                medical_conditions.append("injury")
-            if any(word in query.lower() for word in ["gym", "workout", "exercise", "training"]):
-                medical_conditions.append("fitness-related")
-            if any(word in query.lower() for word in ["flu", "cold", "fever", "cough"]):
-                medical_conditions.append("illness")
-            if any(word in query.lower() for word in ["stress", "anxiety", "depression", "mental"]):
-                medical_conditions.append("mental health")
-            if any(word in query.lower() for word in ["diet", "nutrition", "food", "eating"]):
-                medical_conditions.append("nutrition")
+            # Determine conversation mode and needed information
+            should_ask_about_symptoms = self._should_ask_about_symptoms(query)
+            should_ask_about_medication = self._should_ask_about_medication(query)
             
-            condition_context = ", ".join(medical_conditions) if medical_conditions else "general health"
-            
-            # Construct the prompt with medical context and system instructions
-            prompt = f"""You are an advanced medical AI assistant powered by Google's Gemma model. Your role is to provide helpful, accurate, and empathetic medical information while maintaining appropriate medical disclaimers.
-
-Medical Context: {medical_context}
-
-Query Category: {condition_context}
-
-User Query: {query}
-
-Previous Conversation:
-{history_text}
-
-IMPORTANT INSTRUCTIONS:
-1. Directly address the user's specific query about {condition_context}
-2. Use the medical context provided but adapt it to the user's specific situation
-3. Be factually accurate but also empathetic
-4. If the query mentions a specific injury or condition, prioritize that information
-5. Provide information, recommendations, and any necessary next steps
-6. DO NOT use any special formatting, markdown, or section headers in your response
-7. Simply provide the raw content as plain text paragraphs
-8. I will handle formatting your response appropriately
-
-Please write a helpful, informative response about {condition_context} that addresses the user's query."""
-
-            # Call Ollama API with Gemma model
-            response = requests.post(
-                f"{self.base_url}/generate",
-                json={
-                    "model": self.model,
-                    "prompt": prompt,
-                    "stream": False,
-                    "options": {
-                        "temperature": 0.7,
-                        "top_p": 0.9,
-                        "top_k": 40,
-                        "num_ctx": 4096
-                    }
-                }
+            # Build the base prompt for the model 
+            prompt = (
+                "You are a friendly and helpful medical assistant named MediCare. "
+                "Your goal is to provide helpful medical information in a warm, conversational manner. "
+                "Always respond naturally like a real healthcare professional would in a conversation. "
+                "Avoid using technical medical terminology unless necessary, and explain any medical terms "
+                "you use in simple language. Show empathy and understanding in your responses.\n\n"
+                f"User's question: {query}\n\n"
             )
             
-            if response.status_code == 200:
-                result = response.json()
-                generated_response = result.get("response", "")
+            # Add relevant medical knowledge to the prompt if available
+            if knowledge_info:
+                prompt += f"Relevant medical knowledge: {knowledge_info}\n\n"
                 
-                # Check if the response already has formatting
-                contains_formatting = "**Information**" in generated_response or "**Symptoms**" in generated_response
+            # Add context information if available
+            if context.get('appointment_info'):
+                appointment_info = context.get('appointment_info')
+                prompt += "Appointment Information:\n"
+                for key, value in appointment_info.items():
+                    prompt += f"- {key}: {value}\n"
+                prompt += "\n"
                 
-                if contains_formatting:
-                    # If the model ignored our instructions and already formatted the response,
-                    # just extract the main content without re-formatting
-                    logger.info("Response already contains formatting, using as-is")
-                    formatted_response = generated_response
-                else:
-                    # Format the plain text response
-                    formatted_response = self._format_response(generated_response)
+            if context.get('report_text'):
+                prompt += f"Medical Report to Summarize:\n{context.get('report_text')}\n\n"
+            
+            # Add conversation guidance
+            prompt += (
+                "Guidelines for your response:\n"
+                "1. Be conversational and natural - respond as if you're having a chat\n"
+                "2. Use a warm, friendly tone that builds trust\n"
+                "3. Provide accurate information in a helpful way\n"
+                "4. Address the user's specific concerns directly\n"
+                "5. Use simple language and explain any medical terms\n"
+                "6. Include a brief note that this is informational and not a replacement for professional medical advice\n"
+            )
+            
+            # Add specific questions about symptoms if relevant
+            if should_ask_about_symptoms:
+                prompt += "7. Ask follow-up questions about their symptoms if appropriate\n"
                 
-                # Update conversation history
-                self.conversation_history.append(f"User: {query}\nAssistant: {formatted_response}")
-                if len(self.conversation_history) > self.max_history:
-                    self.conversation_history.pop(0)
-                
-                # Save history to persistent storage
-                history_saved = self._save_history()
-                if not history_saved:
-                    logger.warning("Failed to save conversation history")
-                
-                return formatted_response
-            else:
-                logger.error(f"Error from Ollama API: {response.status_code}")
-                return """**Error**
-- I apologize, but I'm having trouble generating a response
-- Please try again
-
-**Next Steps**
-- Try rephrasing your question
-- Check your internet connection
-- Contact support if the issue persists"""
+            # Add specific questions about medication if relevant
+            if should_ask_about_medication:
+                prompt += "7. Ask follow-up questions about their current medications if appropriate\n"
+            
+            # Get the raw response from the model
+            logger.info(f"Sending prompt to LLM model. Prompt length: {len(prompt)} characters")
+            raw_response = await self.llm_model.generate_text(prompt)
+            logger.info(f"Received raw response. Length: {len(raw_response)} characters")
+            
+            # Apply minimal formatting to preserve natural conversation flow
+            formatted_response = self._format_response(raw_response)
+            
+            return formatted_response
+            
         except Exception as e:
-            logger.error(f"Error in generate_response: {e}")
-            return """**Error**
-- I apologize, but I encountered an error
-- Please try rephrasing your question
-
-**Next Steps**
-- Try asking your question in a different way
-- Make sure your question is clear and specific
-- Try again in a few moments"""
+            # Log the error and return a friendly error message
+            logger.error(f"Error generating response: {str(e)}", exc_info=True)
+            return "I apologize, but I encountered an issue while processing your question. Please try again or rephrase your question."
 
     def clear_history(self):
         """Clear the conversation history"""

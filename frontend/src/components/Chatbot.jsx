@@ -377,19 +377,11 @@ const Chatbot = () => {
 
       try {
         // Send user message and get the response
-        const result = await dispatch(sendUserInput(messageData)).unwrap();
-        console.log("Message sent successfully, got result:", result);
+        await dispatch(sendUserInput(messageData)).unwrap();
+        console.log("Message sent successfully");
 
-        // Directly update the messages state with the response
-        if (result && result.text) {
-          setMessages((prev) => [
-            ...prev,
-            { text: result.text, isUser: false },
-          ]);
-        } else {
-          console.error("Invalid response format:", result);
-          throw new Error("Invalid response from server");
-        }
+        // Don't manually add the AI response here - the response will be handled by the Redux store
+        // This fixes the duplicate message issue
       } catch (error) {
         console.error("Error sending message:", error);
         // Add a more descriptive error message to help debug
@@ -593,13 +585,11 @@ const Chatbot = () => {
       console.log("Sending example message with data:", messageData);
 
       // Send user message and get the response
-      const result = await dispatch(sendUserInput(messageData)).unwrap();
-      console.log("Example message sent successfully:", result);
+      await dispatch(sendUserInput(messageData)).unwrap();
+      console.log("Example message sent successfully");
 
-      // Directly update the messages state with the response
-      if (result && result.text) {
-        setMessages((prev) => [...prev, { text: result.text, isUser: false }]);
-      }
+      // Don't manually add the AI response here - the response will be handled by the Redux store
+      // This fixes the duplicate message issue
     } catch (error) {
       console.error("Error:", error);
       setMessages((prev) => [
