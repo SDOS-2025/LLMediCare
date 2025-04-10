@@ -8,10 +8,31 @@ from pathlib import Path
 import pickle
 import traceback
 import asyncio
+import pytesseract
+from PIL import Image
+import numpy as np
+import io
+import base64
+import sys
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Configure Tesseract path for Windows
+if os.name == 'nt':  # Windows
+    pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
+    # Alternative common locations
+    if not os.path.exists(pytesseract.pytesseract.tesseract_cmd):
+        potential_paths = [
+            r'C:\Program Files (x86)\Tesseract-OCR\tesseract.exe',
+            r'C:\Program Files\Tesseract-OCR\tesseract.exe',
+            r'C:\Tesseract-OCR\tesseract.exe'
+        ]
+        for path in potential_paths:
+            if os.path.exists(path):
+                pytesseract.pytesseract.tesseract_cmd = path
+                break
 
 class OllamaModel:
     """Wrapper for Ollama API to provide a consistent interface for text generation"""
@@ -68,13 +89,20 @@ class OllamaModel:
             return "Sorry, I encountered an error while generating a response."
 
 class MedicalChatbot:
-    def __init__(self):
+    def __init__(self, user_id=None):
         self.base_url = "http://localhost:11434/api"
         self.model = "gemma:2b"  # Using Google's Gemma 2B model
-        self.ai_agent = EnhancedAIAgent()
+        self.user_id = user_id or "default"
+        self.ai_agent = EnhancedAIAgent(user_id=self.user_id)
         self.conversation_history = []
         self.max_history = 10
-        self.history_file = os.path.join(os.path.dirname(__file__), "conversation_history.pkl")
+        
+        # Create a directory for user conversation histories
+        self.history_dir = os.path.join(os.path.dirname(__file__), "conversation_histories")
+        os.makedirs(self.history_dir, exist_ok=True)
+        
+        # Set history file specific to this user
+        self.history_file = os.path.join(self.history_dir, f"history_{self.user_id}.pkl")
         
         # Load any existing history
         self._load_history()
@@ -250,6 +278,114 @@ class MedicalChatbot:
             logger.error(f"Error retrieving additional knowledge: {str(e)}", exc_info=True)
             return ""
 
+    async def process_medical_image(self, image_data: bytes) -> Dict:
+        """
+        Process a medical report image using OCR and analyze the content
+        
+        Args:
+            image_data: The raw image data in bytes
+        
+        Returns:
+            A dictionary containing the extracted text and analysis
+        """
+        try:
+            # Log the image size for debugging
+            logger.info(f"Processing image of size: {len(image_data)} bytes")
+            
+            # Convert image bytes to PIL Image
+            image = Image.open(io.BytesIO(image_data))
+            
+            # Log image details
+            logger.info(f"Image format: {image.format}, size: {image.size}, mode: {image.mode}")
+            
+            # Preprocess the image if needed (for better OCR results)
+            # Convert to grayscale
+            image = image.convert('L')
+            
+            # Verify Tesseract is installed
+            try:
+                tesseract_version = pytesseract.get_tesseract_version()
+                logger.info(f"Tesseract version: {tesseract_version}")
+            except Exception as e:
+                logger.error(f"Tesseract not properly installed: {str(e)}")
+                return {
+                    "success": False,
+                    "error": "Tesseract OCR is not properly installed. Please ensure Tesseract is installed and configured correctly."
+                }
+            
+            # Extract text using OCR
+            try:
+                extracted_text = pytesseract.image_to_string(image)
+                logger.info(f"OCR extraction completed: {len(extracted_text)} characters extracted")
+            except Exception as e:
+                logger.error(f"OCR extraction failed: {str(e)}")
+                return {
+                    "success": False,
+                    "error": f"OCR extraction failed: {str(e)}. Please ensure Tesseract is installed correctly."
+                }
+            
+            if not extracted_text or len(extracted_text.strip()) < 10:
+                logger.warning("Insufficient text extracted from image")
+                return {
+                    "success": False,
+                    "error": "Could not extract sufficient text from the image. Please upload a clearer image."
+                }
+            
+            # Process the extracted text with the LLM
+            prompt = (
+                "You are a medical expert assistant analyzing a doctor's report. "
+                "Below is the text extracted from a medical report using OCR. "
+                "There might be some errors or unclear parts due to the OCR process. "
+                "Please analyze this report and provide the following information in a structured format:\n\n"
+                
+                "## Report Summary\n"
+                "Provide a concise summary of the key points in the report.\n\n"
+                
+                "## Key Medical Findings\n"
+                "List the most important medical findings, test results, and observations from the report.\n\n"
+                
+                "## Diagnosed Conditions\n"
+                "Identify any diagnosed conditions, diseases, or health issues mentioned in the report.\n\n"
+                
+                "## Medications & Treatments\n"
+                "List all medications, dosages, treatment plans, or therapies mentioned in the report.\n\n"
+                
+                "## Recommendations\n"
+                "Provide detailed recommendations based on the report including:\n"
+                "- Lifestyle modifications\n"
+                "- Diet changes\n"
+                "- Exercise recommendations\n"
+                "- Follow-up appointments\n"
+                "- When to seek immediate medical attention\n\n"
+                
+                "## Important Warnings\n"
+                "Highlight any warnings, precautions, or critical information the patient should be aware of.\n\n"
+                
+                f"REPORT TEXT:\n{extracted_text}\n\n"
+                
+                "Format your response with clear section headings and bullet points for easy readability. "
+                "If some parts of the text are unclear or seem like OCR errors, use your medical knowledge to make reasonable interpretations, "
+                "but indicate when you're unsure about certain details."
+            )
+            
+            # Generate the analysis using the LLM
+            analysis = await self.llm_model.generate_text(prompt)
+            
+            return {
+                "success": True,
+                "extracted_text": extracted_text,
+                "analysis": analysis
+            }
+            
+        except Exception as e:
+            logger.error(f"Error processing medical image: {str(e)}", exc_info=True)
+            error_message = f"Error processing image: {str(e)}"
+            logger.error(f"Detailed error: {error_message}")
+            return {
+                "success": False,
+                "error": error_message
+            }
+
     async def generate_response(self, query: str, context: Dict = None) -> str:
         """
         Generate a conversational response to the user's query
@@ -294,6 +430,10 @@ class MedicalChatbot:
                 
             if context.get('report_text'):
                 prompt += f"Medical Report to Summarize:\n{context.get('report_text')}\n\n"
+                
+            if context.get('report_analysis'):
+                prompt += f"Medical Report Analysis:\n{context.get('report_analysis')}\n\n"
+                prompt += "Based on this medical report, provide a helpful response addressing any concerns, explaining the findings, and suggesting appropriate next steps.\n\n"
             
             # Add conversation guidance
             prompt += (

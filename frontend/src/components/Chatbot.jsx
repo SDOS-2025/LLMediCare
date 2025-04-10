@@ -19,6 +19,10 @@ import {
   ListItemButton,
   ListItemText,
   ListItemIcon,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
 } from "@mui/material";
 import SendIcon from "@mui/icons-material/Send";
 import DeleteIcon from "@mui/icons-material/Delete";
@@ -28,6 +32,9 @@ import AddIcon from "@mui/icons-material/Add";
 import HistoryIcon from "@mui/icons-material/History";
 import ChatIcon from "@mui/icons-material/Chat";
 import MenuIcon from "@mui/icons-material/Menu";
+import UploadFileIcon from "@mui/icons-material/UploadFile";
+import ImageIcon from "@mui/icons-material/Image";
+import DescriptionIcon from "@mui/icons-material/Description";
 import { styled } from "@mui/material/styles";
 import { useDispatch, useSelector } from "react-redux";
 import {
@@ -36,7 +43,9 @@ import {
   getUserSessions,
   setCurrentSession,
   clearMessages,
+  addMessage,
 } from "../store/slices/sessionSlice";
+import axios from "axios";
 
 // Styled components
 const ChatContainer = styled(Paper)(({ theme }) => ({
@@ -206,6 +215,10 @@ const Chatbot = () => {
   });
   const [drawerOpen, setDrawerOpen] = useState(false);
   const messagesEndRef = useRef(null);
+  const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef(null);
 
   // Load user's chat sessions when component mounts or when user changes
   useEffect(() => {
@@ -610,6 +623,265 @@ const Chatbot = () => {
     }
   };
 
+  const handleUploadButtonClick = () => {
+    setUploadDialogOpen(true);
+  };
+
+  const handleCloseUploadDialog = () => {
+    setUploadDialogOpen(false);
+    setSelectedFile(null);
+  };
+
+  const handleFileSelect = (event) => {
+    const file = event.target.files[0];
+    if (file && file.type.startsWith("image/")) {
+      setSelectedFile(file);
+    } else {
+      setSnackbar({
+        open: true,
+        message: "Please select a valid image file",
+        severity: "error",
+      });
+    }
+  };
+
+  const handleUploadReport = async () => {
+    if (!selectedFile) {
+      setSnackbar({
+        open: true,
+        message: "Please select a file first",
+        severity: "warning",
+      });
+      return;
+    }
+
+    if (!currentUser) {
+      setSnackbar({
+        open: true,
+        message: "Please log in to upload reports",
+        severity: "warning",
+      });
+      return;
+    }
+
+    setIsUploading(true);
+
+    try {
+      let sessionId = currentSession?.id;
+
+      if (!sessionId) {
+        try {
+          const newSession = await dispatch(
+            createNewSession(currentUser.email)
+          ).unwrap();
+          sessionId = newSession.id;
+          dispatch(setCurrentSession(newSession));
+        } catch (error) {
+          console.error("Error creating session:", error);
+          setSnackbar({
+            open: true,
+            message: "Failed to create a new chat session. Please try again.",
+            severity: "error",
+          });
+          setIsUploading(false);
+          return;
+        }
+      }
+
+      // Create form data
+      const formData = new FormData();
+      formData.append("file", selectedFile);
+      formData.append("user_id", currentUser.email);
+      formData.append("session_id", sessionId);
+
+      // Add user message about uploading report
+      const userMessage = {
+        id: Date.now(),
+        session_id: sessionId,
+        sender: "user",
+        message: `I've uploaded a medical report image named "${selectedFile.name}" for analysis.`,
+        created_at: new Date().toISOString(),
+      };
+
+      dispatch(addMessage(userMessage));
+
+      // Display a loading message while processing
+      const tempLoadingMessage = {
+        id: Date.now() + 1,
+        session_id: sessionId,
+        sender: "assistant",
+        message:
+          "I'm analyzing your medical report image. This may take a moment...",
+        created_at: new Date().toISOString(),
+        isLoading: true,
+      };
+
+      dispatch(addMessage(tempLoadingMessage));
+
+      console.log("Uploading medical report to backend...");
+
+      // Upload the file to the backend
+      try {
+        const response = await axios.post(
+          "http://localhost:8000/api/ai/process-medical-report/",
+          formData,
+          {
+            headers: {
+              "Content-Type": "multipart/form-data",
+            },
+            timeout: 30000, // 30 second timeout
+          }
+        );
+
+        console.log("Upload response:", response.data);
+
+        // Remove the loading message
+        dispatch({
+          type: "session/removeMessage",
+          payload: tempLoadingMessage.id,
+        });
+
+        if (response.data && response.data.success) {
+          console.log("OCR analysis:", response.data.analysis);
+          console.log("Current sessionId:", sessionId);
+
+          // Format the analysis in a readable way - create message object first
+          const analysisMessage = {
+            id: Date.now() + 2,
+            session_id: sessionId,
+            sender: "assistant",
+            message: `# Medical Report Analysis\n\n${response.data.analysis}\n\n## Recommendations\nBased on this medical report, I recommend:\n- Follow any prescribed medications exactly as directed\n- Schedule follow-up appointments as mentioned in the report\n- Monitor your symptoms and report any changes to your doctor\n- Maintain a healthy lifestyle with proper diet and exercise as appropriate for your condition\n\n*Disclaimer: This analysis is based on OCR text extraction and may not be fully accurate. Always consult with a healthcare professional for proper medical advice.*`,
+            created_at: new Date().toISOString(),
+          };
+
+          console.log("Dispatching analysis message:", analysisMessage);
+
+          // Add the message both to Redux store and local state
+          dispatch(addMessage(analysisMessage));
+          setMessages((prev) => [
+            ...prev,
+            { text: analysisMessage.message, isUser: false },
+          ]);
+
+          // Add a follow-up question to encourage conversation
+          setTimeout(() => {
+            const followUpMessage = {
+              id: Date.now() + 3,
+              session_id: sessionId,
+              sender: "assistant",
+              message:
+                "Do you have any questions about the report or need clarification on any part of the analysis?",
+              created_at: new Date().toISOString(),
+            };
+
+            dispatch(addMessage(followUpMessage));
+            setMessages((prev) => [
+              ...prev,
+              { text: followUpMessage.message, isUser: false },
+            ]);
+          }, 2000);
+
+          setSnackbar({
+            open: true,
+            message: "Medical report processed successfully",
+            severity: "success",
+          });
+        } else {
+          console.log("OCR processing failed:", response.data);
+
+          const errorMessage = {
+            id: Date.now() + 2,
+            session_id: sessionId,
+            sender: "assistant",
+            message: `I couldn't properly analyze the report image. ${
+              response.data?.error ||
+              "Please make sure the image is clear and contains readable text."
+            }`,
+            created_at: new Date().toISOString(),
+          };
+
+          dispatch(addMessage(errorMessage));
+          setMessages((prev) => [
+            ...prev,
+            { text: errorMessage.message, isUser: false },
+          ]);
+
+          setSnackbar({
+            open: true,
+            message:
+              response.data?.error || "Failed to process the medical report",
+            severity: "error",
+          });
+        }
+      } catch (uploadError) {
+        console.error("Error during upload:", uploadError);
+
+        // Remove the loading message
+        dispatch({
+          type: "session/removeMessage",
+          payload: tempLoadingMessage.id,
+        });
+
+        // Add more detailed error message
+        const uploadErrorDetail =
+          uploadError.response?.data?.error ||
+          (uploadError.message === "Network Error"
+            ? "Backend server may not be running. Please check your server connection."
+            : uploadError.message);
+
+        const errorMessage = {
+          id: Date.now() + 2,
+          session_id: sessionId,
+          sender: "assistant",
+          message: `I encountered an error while processing your medical report: ${uploadErrorDetail}. This could be because Tesseract OCR is not properly installed on the server.`,
+          created_at: new Date().toISOString(),
+        };
+
+        dispatch(addMessage(errorMessage));
+        // Also update local state directly for immediate display
+        setMessages((prev) => [
+          ...prev,
+          { text: errorMessage.message, isUser: false },
+        ]);
+
+        setSnackbar({
+          open: true,
+          message: uploadErrorDetail || "Error processing medical report",
+          severity: "error",
+        });
+      }
+    } catch (error) {
+      console.error("General error in handleUploadReport:", error);
+
+      const generalErrorMsg = {
+        id: Date.now() + 2,
+        session_id: currentSession?.id,
+        sender: "assistant",
+        message:
+          "I'm sorry, but I encountered an error while processing your medical report. Please try again later.",
+        created_at: new Date().toISOString(),
+      };
+
+      dispatch(addMessage(generalErrorMsg));
+      // Also update local state directly
+      setMessages((prev) => [
+        ...prev,
+        { text: generalErrorMsg.message, isUser: false },
+      ]);
+
+      setSnackbar({
+        open: true,
+        message:
+          error.response?.data?.error || "Error processing medical report",
+        severity: "error",
+      });
+    } finally {
+      setIsUploading(false);
+      setUploadDialogOpen(false);
+      setSelectedFile(null);
+    }
+  };
+
   return (
     <Container maxWidth="md" sx={{ mt: 4, mb: 4 }}>
       <ChatContainer elevation={3}>
@@ -971,42 +1243,122 @@ const Chatbot = () => {
               },
             }}
           />
+          <Tooltip title="Upload Medical Report">
+            <IconButton
+              color="primary"
+              onClick={handleUploadButtonClick}
+              disabled={isLoading}
+            >
+              <UploadFileIcon />
+            </IconButton>
+          </Tooltip>
           <Tooltip title="Send Message">
-            <span>
-              <IconButton
-                color="primary"
-                onClick={handleSend}
-                disabled={!input.trim() || isLoading}
-                aria-label="Send Message"
-                sx={{
-                  bgcolor: "primary.main",
+            <IconButton
+              color="primary"
+              onClick={handleSend}
+              disabled={!input.trim() || isLoading}
+              aria-label="Send Message"
+              sx={{
+                bgcolor: "primary.main",
+                color: "white",
+                borderRadius: "12px",
+                height: "48px",
+                width: "48px",
+                "&:hover": {
+                  bgcolor: "primary.dark",
+                },
+                "&.Mui-disabled": {
+                  backgroundColor: "rgba(25, 118, 210, 0.3)",
                   color: "white",
-                  borderRadius: "12px",
-                  height: "48px",
-                  width: "48px",
-                  "&:hover": {
-                    bgcolor: "primary.dark",
-                  },
-                  "&.Mui-disabled": {
-                    backgroundColor: "rgba(25, 118, 210, 0.3)",
-                    color: "white",
-                  },
-                  transition: "transform 0.2s",
-                  "&:hover:not(.Mui-disabled)": {
-                    transform: "scale(1.05)",
-                  },
-                }}
-              >
-                {isLoading ? (
-                  <CircularProgress size={24} color="inherit" />
-                ) : (
-                  <SendIcon />
-                )}
-              </IconButton>
-            </span>
+                },
+                transition: "transform 0.2s",
+                "&:hover:not(.Mui-disabled)": {
+                  transform: "scale(1.05)",
+                },
+              }}
+            >
+              {isLoading ? (
+                <CircularProgress size={24} color="inherit" />
+              ) : (
+                <SendIcon />
+              )}
+            </IconButton>
           </Tooltip>
         </InputContainer>
       </ChatContainer>
+
+      {/* Upload Medical Report Dialog */}
+      <Dialog open={uploadDialogOpen} onClose={handleCloseUploadDialog}>
+        <DialogTitle>Upload Medical Report</DialogTitle>
+        <DialogContent>
+          <Typography variant="body1" gutterBottom>
+            Upload a clear image of your medical report. The AI will use OCR
+            technology to extract and analyze the text.
+          </Typography>
+          <Box
+            sx={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              mt: 2,
+              mb: 2,
+            }}
+          >
+            <input
+              accept="image/*"
+              style={{ display: "none" }}
+              id="report-file-input"
+              type="file"
+              onChange={handleFileSelect}
+              ref={fileInputRef}
+            />
+            <label htmlFor="report-file-input">
+              <Button
+                variant="outlined"
+                component="span"
+                startIcon={<ImageIcon />}
+                sx={{ mb: 2 }}
+              >
+                Select Image
+              </Button>
+            </label>
+            {selectedFile && (
+              <Box
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  mt: 1,
+                  p: 1,
+                  border: "1px solid #e0e0e0",
+                  borderRadius: 1,
+                  width: "100%",
+                }}
+              >
+                <DescriptionIcon sx={{ mr: 1, color: "primary.main" }} />
+                <Typography noWrap variant="body2">
+                  {selectedFile.name}
+                </Typography>
+              </Box>
+            )}
+          </Box>
+          <Typography variant="caption" color="text.secondary">
+            For best results, ensure the image is well-lit and the text is
+            clearly visible. Supported formats: JPG, PNG, GIF, BMP
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseUploadDialog}>Cancel</Button>
+          <Button
+            onClick={handleUploadReport}
+            variant="contained"
+            color="primary"
+            disabled={!selectedFile || isUploading}
+            startIcon={isUploading ? <CircularProgress size={20} /> : null}
+          >
+            {isUploading ? "Processing..." : "Upload and Analyze"}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       <Snackbar
         open={snackbar.open}

@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from langchain.llms import LlamaCpp
@@ -7,6 +7,10 @@ from langchain.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
 from langchain.prompts import PromptTemplate
 from langchain.chains import LLMChain
 import os
+from typing import Optional
+import uuid
+from ai_agent.chatbot import MedicalChatbot
+from fastapi.responses import JSONResponse
 
 app = FastAPI()
 
@@ -86,6 +90,19 @@ chain = LLMChain(llm=llm, prompt=prompt)
 class SymptomRequest(BaseModel):
     message: str
 
+class ReportAnalysisRequest(BaseModel):
+    session_id: Optional[str] = None
+    user_id: str
+
+# Create a dictionary to store user-specific chatbot instances
+user_chatbots = {}
+
+def get_chatbot(user_id: str = "default"):
+    """Get or create a chatbot instance for the specified user"""
+    if user_id not in user_chatbots:
+        user_chatbots[user_id] = MedicalChatbot(user_id=user_id)
+    return user_chatbots[user_id]
+
 @app.get("/")
 async def root():
     """Health check endpoint"""
@@ -105,6 +122,54 @@ async def get_medical_response(request: SymptomRequest):
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/process-medical-report/")
+async def process_medical_report(
+    file: UploadFile = File(...),
+    user_id: str = Form(...),
+    session_id: Optional[str] = Form(None)
+):
+    """
+    Process an uploaded medical report image using OCR
+    and analyze its content
+    """
+    try:
+        # Check file type
+        if not file.content_type.startswith('image/'):
+            return JSONResponse(
+                status_code=400,
+                content={"success": False, "error": "Uploaded file must be an image"}
+            )
+        
+        # Read the file contents
+        image_data = await file.read()
+        
+        # Get the chatbot instance for this user
+        chatbot = get_chatbot(user_id)
+        
+        # Process the image with OCR
+        result = await chatbot.process_medical_image(image_data)
+        
+        if not result["success"]:
+            return JSONResponse(
+                status_code=400,
+                content=result
+            )
+        
+        # Return the analysis results
+        return {
+            "success": True,
+            "extracted_text": result["extracted_text"],
+            "analysis": result["analysis"],
+            "message": "Medical report processed successfully"
+        }
+        
+    except Exception as e:
+        logger.error(f"Error processing medical report: {str(e)}", exc_info=True)
+        return JSONResponse(
+            status_code=500,
+            content={"success": False, "error": f"Error processing report: {str(e)}"}
+        )
 
 if __name__ == "__main__":
     import uvicorn

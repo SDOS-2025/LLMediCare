@@ -11,7 +11,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class EnhancedAIAgent:
-    def __init__(self):
+    def __init__(self, user_id=None):
         logger.info("Initializing EnhancedAIAgent with sentence-transformers")
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         
@@ -19,10 +19,17 @@ class EnhancedAIAgent:
         self.model = SentenceTransformer('all-MiniLM-L6-v2')
         self.model.to(self.device)
         
-        # Initialize conversation memory
+        # Initialize conversation memory with user-specific history
         self.conversation_history = []
         self.max_history = 5
-        self.history_file = os.path.join(os.path.dirname(__file__), "agent_history.pkl")
+        self.user_id = user_id or "default"
+        
+        # Create a directory for user agent histories
+        self.history_dir = os.path.join(os.path.dirname(__file__), "agent_histories")
+        os.makedirs(self.history_dir, exist_ok=True)
+        
+        # Set history file specific to this user
+        self.history_file = os.path.join(self.history_dir, f"agent_history_{self.user_id}.pkl")
         
         # Load any existing history
         self._load_history()
