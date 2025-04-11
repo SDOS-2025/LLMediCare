@@ -1,11 +1,10 @@
 from rest_framework import serializers
 from .models import User, Session
-from .models import MedicalRecord, Document, Medication
-
+from .models import MedicalRecord, Document, Medication,Appointment
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ['id', 'name', 'email', 'medical_records', 'profile_pic']
+        fields = ['name', 'email', 'role', 'medical_records', 'profile_pic'] 
 
 class SessionSerializer(serializers.ModelSerializer):
     user_email = serializers.CharField(write_only=True)  # Accept email instead of ID
@@ -25,4 +24,9 @@ class DocumentSerializer(serializers.ModelSerializer):
 class MedicationSerializer(serializers.ModelSerializer):
     class Meta:
         model = Medication
+        fields = '__all__'
+
+class AppointmentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Appointment
         fields = '__all__'

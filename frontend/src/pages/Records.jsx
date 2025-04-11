@@ -104,7 +104,7 @@ export default function Records() {
           <RecordsContainer>
             <div className="text-center">
               <h2 className="text-2xl font-bold mb-4">
-                Your Medical Records
+                Your Medical Repository
               </h2>
               <p className="mb-6">
                 Please sign in to view and manage your medical records.
@@ -124,7 +124,7 @@ export default function Records() {
         <RecordsContainer>
           <RecordsHeader>
             <h2 className="text-3xl font-bold mb-2">
-              Your Medical Records
+            Your Medical Repository
             </h2>
             <p className="text-gray-600 mb-8">
               Access and manage your complete health information
@@ -431,10 +431,11 @@ const RecordItem = styled.li`
   margin-bottom: 1rem;
   background-color: white;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-  transition: all 0.2s ease-in-out;
+  transition: all 0.3s ease-in-out;
   
   &:hover {
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+    transform: scale(1.02);
   }
 `;
 
@@ -450,10 +451,11 @@ const DocumentItem = styled.li`
   margin-bottom: 1rem;
   background-color: white;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-  transition: all 0.2s ease-in-out;
+  transition: all 0.3s ease-in-out;
   
   &:hover {
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+    transform: scale(1.02);
   }
 `;
 
@@ -469,10 +471,11 @@ const MedicationItem = styled.li`
   margin-bottom: 1rem;
   background-color: white;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-  transition: all 0.2s ease-in-out;
+  transition: all 0.3s ease-in-out;
   
   &:hover {
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+    transform: scale(1.02);
   }
 `;
 

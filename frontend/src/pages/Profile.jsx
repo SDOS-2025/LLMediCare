@@ -478,7 +478,7 @@ import { FaPen, FaCheck, FaTrash, FaTimes, FaUser } from "react-icons/fa";
 import { updateUserDetails } from "../store/slices/userSlice.js";
 import { getAuth, sendPasswordResetEmail, updateEmail } from "firebase/auth";
 import { auth } from "../utils/firebase-config.js";
-import Records from "../components/Records.jsx";
+import Records from "./Records.jsx";
 import Notifications from "../components/Notifications.jsx";
 
 export default function ProfilePage() {

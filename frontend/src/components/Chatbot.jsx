@@ -48,121 +48,6 @@ import {
 } from "../store/slices/sessionSlice";
 import axios from "axios";
 
-// Styled components
-const ChatContainer = styled(Paper)(({ theme }) => ({
-  height: "calc(100vh - 200px)",
-  display: "flex",
-  flexDirection: "column",
-  backgroundColor: "#ffffff",
-  borderRadius: "24px",
-  overflow: "hidden",
-  boxShadow: "0 8px 32px rgba(0, 0, 0, 0.08)",
-  border: "1px solid rgba(0, 0, 0, 0.05)",
-  transition: "all 0.3s ease",
-  "&:hover": {
-    boxShadow: "0 12px 40px rgba(0, 0, 0, 0.12)",
-  },
-}));
-
-const MessagesContainer = styled(Box)(({ theme }) => ({
-  flex: 1,
-  overflowY: "auto",
-  padding: theme.spacing(3),
-  background: "linear-gradient(180deg, #f8f9fa 0%, #ffffff 100%)",
-  "&::-webkit-scrollbar": {
-    width: "6px",
-  },
-  "&::-webkit-scrollbar-track": {
-    background: "transparent",
-  },
-  "&::-webkit-scrollbar-thumb": {
-    background: "#cbd5e1",
-    borderRadius: "12px",
-    "&:hover": {
-      background: "#94a3b8",
-    },
-  },
-}));
-
-const MessageBubble = styled(Box)(({ theme, isUser }) => ({
-  maxWidth: "80%",
-  margin: "12px 0",
-  padding: "16px 24px",
-  borderRadius: isUser ? "20px 20px 4px 20px" : "20px 20px 20px 4px",
-  backgroundColor: isUser ? theme.palette.primary.main : "#f8fafc",
-  color: isUser ? "#fff" : theme.palette.text.primary,
-  alignSelf: isUser ? "flex-end" : "flex-start",
-  boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
-  width: "fit-content",
-  transition: "transform 0.2s ease",
-  "&:hover": {
-    transform: "translateY(-1px)",
-  },
-  "& .markdown-content": {
-    fontFamily: "'Roboto', sans-serif",
-    width: "100%",
-  },
-  "& h3": {
-    color: isUser ? "#fff" : theme.palette.primary.main,
-    fontSize: "1.1rem",
-    fontWeight: "600",
-    margin: "16px 0 8px 0",
-    borderBottom: `1px solid ${
-      isUser ? "rgba(255,255,255,0.2)" : "rgba(25,118,210,0.2)"
-    }`,
-    paddingBottom: "4px",
-  },
-  "& ul, & ol": {
-    margin: "8px 0",
-    paddingLeft: "20px",
-  },
-  "& ul": {
-    listStyleType: "disc",
-  },
-  "& ol": {
-    listStyleType: "decimal",
-  },
-  "& li": {
-    margin: "4px 0",
-    display: "list-item",
-    paddingLeft: "4px",
-  },
-  "& li::marker": {
-    color: isUser ? "#fff" : theme.palette.primary.main,
-  },
-  "& ol > li": {
-    paddingLeft: "8px",
-  },
-  "& p": {
-    margin: "8px 0",
-  },
-  "& em": {
-    color: isUser ? "rgba(255,255,255,0.8)" : "rgba(0,0,0,0.6)",
-    fontStyle: "italic",
-    display: "block",
-    marginTop: "10px",
-  },
-}));
-
-const InputContainer = styled(Box)(({ theme }) => ({
-  display: "flex",
-  padding: theme.spacing(2),
-  backgroundColor: "#ffffff",
-  borderTop: "1px solid rgba(0,0,0,0.06)",
-  gap: theme.spacing(1),
-  position: "relative",
-  "&::before": {
-    content: '""',
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    height: "1px",
-    background:
-      "linear-gradient(90deg, transparent, rgba(0,0,0,0.05), transparent)",
-  },
-}));
-
 const formatResponse = (text) => {
   if (!text) return "";
 
@@ -253,7 +138,7 @@ const formatResponse = (text) => {
   return formatted;
 };
 
-const Chatbot = () => {
+export default function Chatbot () {
   const dispatch = useDispatch();
   const currentUser = useSelector((state) => state.user.currentUser);
   const currentSession = useSelector((state) => state.session.currentSession);
@@ -1589,4 +1474,118 @@ const Chatbot = () => {
   );
 };
 
-export default Chatbot;
+// Styled components
+const ChatContainer = styled(Paper)(({ theme }) => ({
+  height: "calc(100% - 50px)",
+  width: "calc(100vw - 110px)",
+  display: "flex",
+  flexDirection: "column",
+  backgroundColor: "#ffffff",
+  borderRadius: "24px",
+  overflow: "hidden",
+  boxShadow: "0 8px 32px rgba(0, 0, 0, 0.08)",
+  border: "1px solid rgba(0, 0, 0, 0.05)",
+  transition: "all 0.3s ease",
+  "&:hover": {
+    boxShadow: "0 12px 40px rgba(0, 0, 0, 0.12)",
+  },
+}));
+
+const MessagesContainer = styled(Box)(({ theme }) => ({
+  flex: 1,
+  overflowY: "auto",
+  padding: theme.spacing(3),
+  background: "linear-gradient(180deg, #f8f9fa 0%, #ffffff 100%)",
+  "&::-webkit-scrollbar": {
+    width: "6px",
+  },
+  "&::-webkit-scrollbar-track": {
+    background: "transparent",
+  },
+  "&::-webkit-scrollbar-thumb": {
+    background: "#cbd5e1",
+    borderRadius: "12px",
+    "&:hover": {
+      background: "#94a3b8",
+    },
+  },
+}));
+
+const MessageBubble = styled(Box)(({ theme, isUser }) => ({
+  maxWidth: "80%",
+  margin: "12px 0",
+  padding: "16px 24px",
+  borderRadius: isUser ? "20px 20px 4px 20px" : "20px 20px 20px 4px",
+  backgroundColor: isUser ? theme.palette.primary.main : "#f8fafc",
+  color: isUser ? "#fff" : theme.palette.text.primary,
+  alignSelf: isUser ? "flex-end" : "flex-start",
+  boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
+  width: "fit-content",
+  transition: "transform 0.2s ease",
+  "&:hover": {
+    transform: "translateY(-1px)",
+  },
+  "& .markdown-content": {
+    fontFamily: "'Roboto', sans-serif",
+    width: "100%",
+  },
+  "& h3": {
+    color: isUser ? "#fff" : theme.palette.primary.main,
+    fontSize: "1.1rem",
+    fontWeight: "600",
+    margin: "16px 0 8px 0",
+    borderBottom: `1px solid ${
+      isUser ? "rgba(255,255,255,0.2)" : "rgba(25,118,210,0.2)"
+    }`,
+    paddingBottom: "4px",
+  },
+  "& ul, & ol": {
+    margin: "8px 0",
+    paddingLeft: "20px",
+  },
+  "& ul": {
+    listStyleType: "disc",
+  },
+  "& ol": {
+    listStyleType: "decimal",
+  },
+  "& li": {
+    margin: "4px 0",
+    display: "list-item",
+    paddingLeft: "4px",
+  },
+  "& li::marker": {
+    color: isUser ? "#fff" : theme.palette.primary.main,
+  },
+  "& ol > li": {
+    paddingLeft: "8px",
+  },
+  "& p": {
+    margin: "8px 0",
+  },
+  "& em": {
+    color: isUser ? "rgba(255,255,255,0.8)" : "rgba(0,0,0,0.6)",
+    fontStyle: "italic",
+    display: "block",
+    marginTop: "10px",
+  },
+}));
+
+const InputContainer = styled(Box)(({ theme }) => ({
+  display: "flex",
+  padding: theme.spacing(2),
+  backgroundColor: "#ffffff",
+  borderTop: "1px solid rgba(0,0,0,0.06)",
+  gap: theme.spacing(1),
+  position: "relative",
+  "&::before": {
+    content: '""',
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: "1px",
+    background:
+      "linear-gradient(90deg, transparent, rgba(0,0,0,0.05), transparent)",
+  },
+}));

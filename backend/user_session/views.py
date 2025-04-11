@@ -1,9 +1,11 @@
 from django.shortcuts import get_object_or_404
-from rest_framework import viewsets, status
+from rest_framework import viewsets, status, permissions
 from rest_framework.response import Response
 from rest_framework.decorators import action, api_view
 from .models import User, Session, MedicalRecord, Document, Medication
 from .serializers import UserSerializer, SessionSerializer, MedicalRecordSerializer, DocumentSerializer, MedicationSerializer
+from .models import Appointment
+from .serializers import AppointmentSerializer
 
 class UserViewSet(viewsets.ModelViewSet):
     """
@@ -274,3 +276,187 @@ def add_document(request):
         serializer.save()  # Optionally, you can associate the document with a user here
         return Response(serializer.data, status=status.HTTP_201_CREATED)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+class AppointmentViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for CRUD operations on Appointments.
+    Patients can create an appointment by selecting a doctor.
+    Doctors only see the appointments booked with them.
+    """
+    queryset = Appointment.objects.all()
+    serializer_class = AppointmentSerializer
+
+    def get_queryset(self):
+        # Filter appointments based on provided email query param.
+        user_email = self.request.query_params.get("email")
+        if user_email:
+            user = get_object_or_404(User, email=user_email)
+            if user.role == "doctor":
+                return Appointment.objects.filter(doctor=user)
+            else:
+                return Appointment.objects.filter(patient=user)
+        return super().get_queryset()
+
+    def create(self, request, *args, **kwargs):
+        """
+        For patients: create an appointment by providing the doctor’s email, appointment_date, times, etc.
+        The patient is attached automatically from the email query parameter.
+        """
+        serializer = self.get_serializer(data=request.data)
+        if serializer.is_valid():
+            # Expect the patient's email to be provided as a query parameter
+            patient_email = request.query_params.get("email")
+            if patient_email:
+                patient = get_object_or_404(User, email=patient_email)
+                appointment = serializer.save(patient=patient)
+            else:
+                appointment = serializer.save()
+            return Response(AppointmentSerializer(appointment).data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+# Custom permission classes
+class IsDoctor(permissions.BasePermission):
+    """
+    Custom permission to only allow doctors to access or modify the resource.
+    """
+    def has_permission(self, request, view):
+        # Check if user exists and has role 'doctor'
+        return request.user and hasattr(request.user, 'role') and request.user.role == 'doctor'
+
+class IsPatient(permissions.BasePermission):
+    """
+    Custom permission to only allow patients to access or modify the resource.
+    """
+    def has_permission(self, request, view):
+        # Check if user exists and has role 'patient'
+        return request.user and hasattr(request.user, 'role') and request.user.role == 'patient'
+
+class MedicalRecordViewSet(viewsets.ModelViewSet):
+    """
+    API endpoint for medical records.
+    Doctors can create/modify medical records.
+    Patients can only view their own medical records.
+    """
+    serializer_class = MedicalRecordSerializer
+    
+    def get_permissions(self):
+        """
+        - Doctors can perform all operations
+        - Patients can only list and retrieve their own records
+        """
+        if self.action in ['create', 'update', 'partial_update', 'destroy']:
+            permission_classes = [IsDoctor]
+        else:
+            permission_classes = [permissions.IsAuthenticated]
+        return [permission() for permission in permission_classes]
+    
+    def get_queryset(self):
+        user = self.request.user
+        
+        # Doctors can see all medical records
+        if user.role == 'doctor':
+            return MedicalRecord.objects.all()
+        # Patients can only see their own records
+        elif user.role == 'patient':
+            return MedicalRecord.objects.filter(user=user)
+        return MedicalRecord.objects.none()
+    
+    def perform_create(self, serializer):
+        """Ensure only doctors can create medical records"""
+        if self.request.user.role != 'doctor':
+            return Response(
+                {"detail": "Only doctors can create medical records."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        serializer.save()
+
+class DocumentViewSet(viewsets.ModelViewSet):
+    """
+    API endpoint for documents.
+    Patients can upload/modify documents.
+    Doctors can view and download documents.
+    """
+    serializer_class = DocumentSerializer
+    
+    def get_permissions(self):
+        """
+        - Patients can perform create/update/delete operations
+        - Doctors can only list and retrieve
+        """
+        if self.action in ['create', 'update', 'partial_update', 'destroy']:
+            permission_classes = [IsPatient]
+        else:
+            permission_classes = [permissions.IsAuthenticated]
+        return [permission() for permission in permission_classes]
+    
+    def get_queryset(self):
+        user = self.request.user
+        
+        # Doctors can view all documents
+        if user.role == 'doctor':
+            return Document.objects.all()
+        # Patients can only see their own documents
+        elif user.role == 'patient':
+            return Document.objects.filter(user=user)
+        return Document.objects.none()
+    
+    def perform_create(self, serializer):
+        """Associate the document with the current user"""
+        serializer.save(user=self.request.user)
+    
+    @action(detail=True, methods=['get'])
+    def download(self, request, pk=None):
+        """
+        Endpoint for doctors to download documents
+        """
+        document = self.get_object()
+        
+        # Only doctors can download
+        if request.user.role != 'doctor':
+            return Response(
+                {"detail": "Only doctors can download documents."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # In a real implementation, you would handle the file download here
+        # For this example, we'll just return the file URL
+        return Response({"file_url": document.file_url})
+
+class MedicationViewSet(viewsets.ModelViewSet):
+    """
+    API endpoint for medications.
+    Doctors can create/modify medications.
+    Patients can only view their prescribed medications.
+    """
+    serializer_class = MedicationSerializer
+    
+    def get_permissions(self):
+        """
+        - Doctors can perform all operations
+        - Patients can only list and retrieve their own medications
+        """
+        if self.action in ['create', 'update', 'partial_update', 'destroy']:
+            permission_classes = [IsDoctor]
+        else:
+            permission_classes = [permissions.IsAuthenticated]
+        return [permission() for permission in permission_classes]
+    
+    def get_queryset(self):
+        user = self.request.user
+        
+        # Doctors can see all medications
+        if user.role == 'doctor':
+            return Medication.objects.all()
+        # Patients can only see their own medications
+        elif user.role == 'patient':
+            return Medication.objects.filter(user=user)
+        return Medication.objects.none()
+    
+    def perform_create(self, serializer):
+        """Ensure only doctors can create medications"""
+        if self.request.user.role != 'doctor':
+            return Response(
+                {"detail": "Only doctors can prescribe medications."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        serializer.save()
