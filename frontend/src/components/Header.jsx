@@ -8,9 +8,34 @@ import Notifications from './Notifications';
 export default function Header({ toggleSidebar, sidebarOpen }) {
   const [showNotifications, setShowNotifications] = useState(false);
 
+  // Mock data for demonstration purposes
+  // In a real app, you would get this from your state/context
+  const notificationCount = 7; // Update this based on actual notifications count
+
   const toggleNotifications = () => {
     setShowNotifications(!showNotifications);
   };
+
+  const handleClickOutside = (e) => {
+    if (e.target.closest('.notifications-dropdown') === null && 
+        e.target.closest('.notification-icon') === null) {
+      setShowNotifications(false);
+    }
+  };
+
+  // Add event listener when notifications are shown
+  React.useEffect(() => {
+    if (showNotifications) {
+      document.addEventListener('mousedown', handleClickOutside);
+    } else {
+      document.removeEventListener('mousedown', handleClickOutside);
+    }
+    
+    // Cleanup
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showNotifications]);
 
   return (
     <HeaderContainer>
@@ -21,13 +46,20 @@ export default function Header({ toggleSidebar, sidebarOpen }) {
         <SearchBar><Search /></SearchBar>
       </LeftSection>
       <RightSection>
-        <NotificationIconContainer onClick={toggleNotifications}>
+        <NotificationIconContainer 
+          onClick={toggleNotifications}
+          className="notification-icon"
+        >
           <FaBell size={20} />
-          <NotificationBadge>3</NotificationBadge>
+          {notificationCount > 0 && (
+            <NotificationBadge>
+              {notificationCount > 99 ? '99+' : notificationCount}
+            </NotificationBadge>
+          )}
         </NotificationIconContainer>
         {showNotifications && (
-          <NotificationsDropdown>
-            <Notifications />
+          <NotificationsDropdown className="notifications-dropdown">
+            <Notifications inDropdown={true} />
           </NotificationsDropdown>
         )}
       </RightSection>
@@ -135,9 +167,10 @@ const NotificationBadge = styled.div`
   color: white;
   font-size: 0.6rem;
   font-weight: 600;
-  height: 18px;
-  width: 18px;
-  border-radius: 50%;
+  min-height: 18px;
+  min-width: 18px;
+  padding: 0 4px;
+  border-radius: 9px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -148,8 +181,6 @@ const NotificationsDropdown = styled.div`
   top: calc(100% + 0.5rem);
   right: 0;
   width: 320px;
-  max-height: 400px;
-  overflow-y: auto;
   background-color: white;
   border-radius: 8px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
