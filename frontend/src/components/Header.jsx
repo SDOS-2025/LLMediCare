@@ -1,20 +1,35 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import styled from 'styled-components';
-import { FaBars } from 'react-icons/fa';
+import { FaBars, FaBell } from 'react-icons/fa';
 import Search from './Search';
+import Notifications from './Notifications';
 
 export default function Header({ toggleSidebar, sidebarOpen }) {
+  const [showNotifications, setShowNotifications] = useState(false);
+
+  const toggleNotifications = () => {
+    setShowNotifications(!showNotifications);
+  };
+
   return (
     <HeaderContainer>
       <LeftSection>
         <MenuButton onClick={toggleSidebar}>
           <FaBars />
         </MenuButton>
-        <Search />
+        <SearchBar><Search /></SearchBar>
       </LeftSection>
       <RightSection>
-        {/* Add any right-side header content here */}
+        <NotificationIconContainer onClick={toggleNotifications}>
+          <FaBell size={20} />
+          <NotificationBadge>3</NotificationBadge>
+        </NotificationIconContainer>
+        {showNotifications && (
+          <NotificationsDropdown>
+            <Notifications />
+          </NotificationsDropdown>
+        )}
       </RightSection>
     </HeaderContainer>
   );
@@ -42,10 +57,17 @@ const LeftSection = styled.div`
   flex: 1;
 `;
 
+const SearchBar = styled.div`
+  display: absolute;
+  width: 100%;
+  margin-left: 20rem;
+`;
+
 const RightSection = styled.div`
   display: flex;
   align-items: center;
   gap: 1rem;
+  position: relative;
 `;
 
 const MenuButton = styled.button`
@@ -86,4 +108,50 @@ const LogoText = styled.span`
   font-weight: 700;
   color: #1e293b;
   letter-spacing: -0.5px;
+`;
+
+const NotificationIconContainer = styled.div`
+  position: relative;
+  cursor: pointer;
+  padding: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #64748b;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+
+  &:hover {
+    background-color: #f1f5f9;
+    color: #0f172a;
+  }
+`;
+
+const NotificationBadge = styled.div`
+  position: absolute;
+  top: 0;
+  right: 0;
+  background-color: #ef4444;
+  color: white;
+  font-size: 0.6rem;
+  font-weight: 600;
+  height: 18px;
+  width: 18px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+`;
+
+const NotificationsDropdown = styled.div`
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  right: 0;
+  width: 320px;
+  max-height: 400px;
+  overflow-y: auto;
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  z-index: 50;
 `;

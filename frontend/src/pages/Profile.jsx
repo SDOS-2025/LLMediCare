@@ -686,12 +686,6 @@ export default function ProfilePage() {
             ))}
           </FormGrid>
         </FormSection>
-        
-        {/* Notifications Section */}
-        <Notifications />
-
-        {/* Existing Records component */}
-        <Records />
       </ContentWrapper>
     </ProfileContainer>
   );

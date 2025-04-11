@@ -17,6 +17,7 @@ import Records from "./components/Records.jsx";
 import Login from "./pages/Login.jsx";
 import Profile from "./pages/Profile.jsx";
 import DoctorDashboard from "./pages/DoctorDashboard.jsx";
+import Message from "./pages/Message.jsx";
 import { auth } from "./utils/firebase-config.js";
 import { onAuthStateChanged } from "firebase/auth";
 import styled from "styled-components";
@@ -109,6 +110,10 @@ export default function App() {
                         allowedRoles={["doctor"]}
                       />
                     }
+                  />
+                  <Route
+                    path="/matrix-chat"
+                    element={<ProtectedRoute element={<Message />} />}
                   />
                 </Routes>
               </div>
