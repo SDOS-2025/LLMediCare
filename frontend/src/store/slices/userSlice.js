@@ -53,16 +53,107 @@ export const updateUserDetails = createAsyncThunk('user/updateUserDetails', asyn
     }
 });
 
+// NEW: Async thunk to fetch all doctors
+export const fetchAllDoctors = createAsyncThunk(
+  'user/fetchAllDoctors',
+  async (_, { rejectWithValue }) => {
+    try {
+      const response = await axios.get(`${API_BASE}/users/doctors/list/`);
+      console.log('Doctors:', response.data);
+      return response.data;
+    } catch (error) {
+      return rejectWithValue(error.response?.data || "Error fetching doctors");
+    }
+  }
+);
+
+// NEW: Async thunk for a doctor to upload a medical record for a patient
+export const uploadMedicalRecord = createAsyncThunk(
+  'user/uploadMedicalRecord',
+  async ({ appointmentId, recordData, doctorEmail }, { rejectWithValue }) => {
+    try {
+      const response = await axios.post(
+        `${API_BASE}/appointments/${appointmentId}/add_medical_record/?email=${doctorEmail}`,
+        recordData
+      );
+      return response.data;
+    } catch (error) {
+      return rejectWithValue(error.response?.data || "Error uploading medical record");
+    }
+  }
+);
+
+// NEW: Async thunk for a doctor to set medication for a patient
+export const setMedication = createAsyncThunk(
+  'user/setMedication',
+  async ({ appointmentId, medicationData, doctorEmail }, { rejectWithValue }) => {
+    try {
+      const response = await axios.post(
+        `${API_BASE}/appointments/${appointmentId}/add_medication/?email=${doctorEmail}`,
+        medicationData
+      );
+      return response.data;
+    } catch (error) {
+      return rejectWithValue(error.response?.data || "Error setting medication");
+    }
+  }
+);
+
+// NEW: Async thunk for a doctor to upload a document for a patient
+export const doctorUploadDocument = createAsyncThunk(
+  'user/doctorUploadDocument',
+  async ({ documentData, doctorEmail, patientEmail }, { rejectWithValue }) => {
+    try {
+      const response = await axios.post(
+        `${API_BASE}/documents/doctor/upload/?doctor_email=${doctorEmail}&patient_email=${patientEmail}`,
+        documentData
+      );
+      return response.data;
+    } catch (error) {
+      return rejectWithValue(error.response?.data || "Error uploading document");
+    }
+  }
+);
+
+// NEW: Async thunk to get a patient's medical records, documents, and medications
+export const fetchPatientRecords = createAsyncThunk(
+  'user/fetchPatientRecords',
+  async (patientEmail, { rejectWithValue }) => {
+    try {
+      const response = await axios.get(`${API_BASE}/records/user/?email=${patientEmail}`);
+      return response.data;
+    } catch (error) {
+      return rejectWithValue(error.response?.data || "Error fetching patient records");
+    }
+  }
+);
+
 const userSlice = createSlice({
     name: 'user',
     initialState: {
         currentUser: null,
+        doctors: [],
+        patientRecords: null,
+        uploadedDocument: null,
+        createdMedicalRecord: null,
+        prescribedMedication: null,
         loading: false,
         error: null,
     },
-    reducers: {},
+    reducers: {
+        clearUploadedDocument: (state) => {
+            state.uploadedDocument = null;
+        },
+        clearCreatedMedicalRecord: (state) => {
+            state.createdMedicalRecord = null;
+        },
+        clearPrescribedMedication: (state) => {
+            state.prescribedMedication = null;
+        }
+    },
     extraReducers: (builder) => {
         builder
+            // Existing reducers
             .addCase(createUser.pending, (state) => { state.loading = true; state.error = null; })
             .addCase(createUser.fulfilled, (state, action) => { state.loading = false; state.currentUser = action.payload; })
             .addCase(createUser.rejected, (state, action) => { state.loading = false; state.error = action.payload; })
@@ -77,8 +168,60 @@ const userSlice = createSlice({
 
             .addCase(updateUserDetails.pending, (state) => { state.loading = true; state.error = null; })
             .addCase(updateUserDetails.fulfilled, (state, action) => { state.loading = false; state.currentUser = action.payload; })
-            .addCase(updateUserDetails.rejected, (state, action) => { state.loading = false; state.error = action.payload; });
+            .addCase(updateUserDetails.rejected, (state, action) => { state.loading = false; state.error = action.payload; })
+
+            // New reducers
+            .addCase(fetchAllDoctors.pending, (state) => { state.loading = true; state.error = null; })
+            .addCase(fetchAllDoctors.fulfilled, (state, action) => { 
+                state.loading = false; 
+                state.doctors = action.payload; 
+            })
+            .addCase(fetchAllDoctors.rejected, (state, action) => { 
+                state.loading = false; 
+                state.error = action.payload; 
+            })
+
+            .addCase(uploadMedicalRecord.pending, (state) => { state.loading = true; state.error = null; })
+            .addCase(uploadMedicalRecord.fulfilled, (state, action) => { 
+                state.loading = false; 
+                state.createdMedicalRecord = action.payload; 
+            })
+            .addCase(uploadMedicalRecord.rejected, (state, action) => { 
+                state.loading = false; 
+                state.error = action.payload; 
+            })
+
+            .addCase(setMedication.pending, (state) => { state.loading = true; state.error = null; })
+            .addCase(setMedication.fulfilled, (state, action) => { 
+                state.loading = false; 
+                state.prescribedMedication = action.payload; 
+            })
+            .addCase(setMedication.rejected, (state, action) => { 
+                state.loading = false; 
+                state.error = action.payload; 
+            })
+
+            .addCase(doctorUploadDocument.pending, (state) => { state.loading = true; state.error = null; })
+            .addCase(doctorUploadDocument.fulfilled, (state, action) => { 
+                state.loading = false; 
+                state.uploadedDocument = action.payload; 
+            })
+            .addCase(doctorUploadDocument.rejected, (state, action) => { 
+                state.loading = false; 
+                state.error = action.payload; 
+            })
+
+            .addCase(fetchPatientRecords.pending, (state) => { state.loading = true; state.error = null; })
+            .addCase(fetchPatientRecords.fulfilled, (state, action) => { 
+                state.loading = false; 
+                state.patientRecords = action.payload; 
+            })
+            .addCase(fetchPatientRecords.rejected, (state, action) => { 
+                state.loading = false; 
+                state.error = action.payload; 
+            });
     },
 });
 
+export const { clearUploadedDocument, clearCreatedMedicalRecord, clearPrescribedMedication } = userSlice.actions;
 export default userSlice.reducer;

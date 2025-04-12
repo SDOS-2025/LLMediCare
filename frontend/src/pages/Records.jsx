@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { useSelector, useDispatch } from 'react-redux';
-import { fetchRecords } from '../store/slices/recordsSlice';
+import { fetchPatientRecords } from '../store/slices/userSlice';
 import Header from '../components/Header';
 import Sidebar from '../components/Sidebar';
 
@@ -23,7 +23,7 @@ export default function Records() {
   // Fetch records when user is available
   useEffect(() => {
     if (user) {
-      dispatch(fetchRecords());
+      dispatch(fetchPatientRecords());
     }
   }, [dispatch, user]);
 
@@ -55,7 +55,7 @@ export default function Records() {
         throw new Error('Failed to add document');
       }
       await response.json();
-      dispatch(fetchRecords());
+      dispatch(fetchPatientRecords());
       // Reset document form
       setDocumentTitle('');
       setDocumentType('test_result');

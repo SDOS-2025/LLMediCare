@@ -19,6 +19,7 @@ class User(models.Model):
 
     def __str__(self):
         return self.name
+
 class Session(models.Model):
     user_email = models.ForeignKey(User, on_delete=models.CASCADE, related_name='sessions')
     session_chats = models.JSONField(default=list, null=True, blank=True)
@@ -41,6 +42,21 @@ class MedicalRecord(models.Model):
 
     def __str__(self):
         return f"{self.type} on {self.date}"
+    
+    # Add to MedicalRecord model
+    def save(self, *args, **kwargs):
+        is_new = not self.pk  # Check if this is a new record
+        super().save(*args, **kwargs)
+        
+        # If this is a new record and associated with a user, notify them
+        if is_new and self.user:
+            Notification.objects.create(
+                user=self.user,
+                title="New Medical Record Added",
+                message=f"Dr. {self.doctor} has added a new {self.type} record to your profile.",
+                type="medical_record",
+                medical_record=self
+            )
 
 class Document(models.Model):
     # Optional: associate a document with a user
@@ -65,14 +81,30 @@ class Medication(models.Model):
 
     def __str__(self):
         return self.name
+    
+    # Add to Medication model
+    def save(self, *args, **kwargs):
+        is_new = not self.pk  # Check if this is a new medication
+        super().save(*args, **kwargs)
+        
+        # If this is a new medication and associated with a user, notify them
+        if is_new and self.user:
+            Notification.objects.create(
+                user=self.user,
+                title="New Medication Added",
+                message=f"A new medication '{self.name}' has been added to your profile.",
+                type="medication",
+                medication=self
+            )
+
 class Appointment(models.Model):
     patient = models.ForeignKey(
-        settings.AUTH_USER_MODEL, 
+        User, 
         on_delete=models.CASCADE, 
         related_name="patient_appointments"
     )
     doctor = models.ForeignKey(
-        settings.AUTH_USER_MODEL, 
+        User, 
         on_delete=models.CASCADE, 
         related_name="doctor_appointments"
     )
@@ -109,3 +141,61 @@ class Appointment(models.Model):
             start_time__lt=self.end_time,
             end_time__gt=self.start_time,
         ).exists()
+    
+    # Add this to the Appointment model
+    def send_notification_on_approval(self):
+        """Create notification when appointment is approved by doctor"""
+        if self.status == 'accepted':
+            Notification.objects.create(
+                user=self.patient,
+                title="Appointment Approved",
+                message=f"Your appointment with Dr. {self.doctor.name} on {self.appointment_date} has been approved.",
+                type="appointment",
+                appointment=self
+            )
+
+    # You can call this method in the save method:
+    def save(self, *args, **kwargs):
+        # If this is an existing appointment being updated
+        if self.pk:
+            old_instance = Appointment.objects.get(pk=self.pk)
+            # If status changed from pending to accepted
+            if old_instance.status != 'accepted' and self.status == 'accepted':
+                super().save(*args, **kwargs)  # Save first to ensure the appointment exists
+                self.send_notification_on_approval()
+            else:
+                super().save(*args, **kwargs)
+        else:
+            super().save(*args, **kwargs)
+            # Create notification for doctor on new appointment request
+            Notification.objects.create(
+                user=self.doctor,
+                title="New Appointment Request",
+                message=f"Patient {self.patient.name} has requested an appointment on {self.appointment_date}.",
+                type="appointment",
+                appointment=self
+            )
+    
+class Notification(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='notifications')
+    title = models.CharField(max_length=255)
+    message = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    read = models.BooleanField(default=False)
+    
+    # Type choices for categorizing notifications
+    TYPE_CHOICES = [
+        ('appointment', 'Appointment'),
+        ('medical_record', 'Medical Record'),
+        ('medication', 'Medication'),
+        ('reminder', 'Medication Reminder'),
+    ]
+    type = models.CharField(max_length=20, choices=TYPE_CHOICES)
+    
+    # Optional reference to related models
+    appointment = models.ForeignKey(Appointment, on_delete=models.SET_NULL, null=True, blank=True)
+    medical_record = models.ForeignKey(MedicalRecord, on_delete=models.SET_NULL, null=True, blank=True)
+    medication = models.ForeignKey(Medication, on_delete=models.SET_NULL, null=True, blank=True)
+    
+    def __str__(self):
+        return f"{self.title} - {self.user.name}"

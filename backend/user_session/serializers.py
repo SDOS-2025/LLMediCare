@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from .models import User, Session
-from .models import MedicalRecord, Document, Medication,Appointment
+from .models import MedicalRecord, Document, Medication, Appointment, Notification
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
@@ -27,6 +27,25 @@ class MedicationSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 class AppointmentSerializer(serializers.ModelSerializer):
+    doctor_email = serializers.CharField(write_only=True)
+
     class Meta:
         model = Appointment
         fields = '__all__'
+        extra_kwargs = {
+            'doctor': {'read_only': True},
+            'patient': {'read_only': True},  # So the patient field is set from the view.
+        }
+
+    def create(self, validated_data):
+        doctor_email = validated_data.pop('doctor_email')
+        from django.shortcuts import get_object_or_404
+        doctor = get_object_or_404(User, email=doctor_email, role='doctor')
+        appointment = Appointment.objects.create(doctor=doctor, **validated_data)
+        return appointment
+    
+class NotificationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Notification
+        fields = '__all__'
+        read_only_fields = ['created_at']

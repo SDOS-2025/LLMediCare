@@ -134,7 +134,6 @@ export default function ChatInterface() {
     <AppContainer>
       <Header toggleSidebar={toggleSidebar} sidebarOpen={sidebarOpen} />
       <Sidebar isOpen={sidebarOpen} setIsOpen={setSidebarOpen} />
-
       <MainContent>
         <Chatbot />
       </MainContent>

@@ -1,11 +1,13 @@
 from django.shortcuts import get_object_or_404
-from rest_framework import viewsets, status, permissions
+from rest_framework import viewsets, status, permissions, filters
 from rest_framework.response import Response
 from rest_framework.decorators import action, api_view
-from .models import User, Session, MedicalRecord, Document, Medication
-from .serializers import UserSerializer, SessionSerializer, MedicalRecordSerializer, DocumentSerializer, MedicationSerializer
-from .models import Appointment
-from .serializers import AppointmentSerializer
+from .models import User, Session, MedicalRecord, Document, Medication, Appointment, Notification
+from .serializers import UserSerializer, SessionSerializer, MedicalRecordSerializer, DocumentSerializer, MedicationSerializer, NotificationSerializer, AppointmentSerializer
+from django.utils import timezone
+from datetime import timedelta
+from backend.user_session import models
+
 
 class UserViewSet(viewsets.ModelViewSet):
     """
@@ -14,6 +16,8 @@ class UserViewSet(viewsets.ModelViewSet):
     queryset = User.objects.all()
     serializer_class = UserSerializer
     lookup_field = "email"  # Use email instead of id
+    filter_backends = [filters.SearchFilter]
+    search_fields = ['name', 'email']
 
     def create(self, request, *args, **kwargs):
         """Create a new User"""
@@ -47,6 +51,13 @@ class UserViewSet(viewsets.ModelViewSet):
         
         user = get_object_or_404(User, email=user_email)
         return Response(UserSerializer(user).data)
+    
+    @action(detail=False, methods=['get'])
+    def doctors(self, request):
+        """Get all doctors with their details"""
+        doctors = User.objects.filter(role='doctor')
+        serializer = UserSerializer(doctors, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
 
 class SessionViewSet(viewsets.ModelViewSet):
@@ -299,7 +310,7 @@ class AppointmentViewSet(viewsets.ModelViewSet):
 
     def create(self, request, *args, **kwargs):
         """
-        For patients: create an appointment by providing the doctor’s email, appointment_date, times, etc.
+        For patients: create an appointment by providing the doctor's email, appointment_date, times, etc.
         The patient is attached automatically from the email query parameter.
         """
         serializer = self.get_serializer(data=request.data)
@@ -314,6 +325,62 @@ class AppointmentViewSet(viewsets.ModelViewSet):
             return Response(AppointmentSerializer(appointment).data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
+    @action(detail=True, methods=['post'])
+    def add_medical_record(self, request, pk=None):
+        """
+        Allow doctors to upload medical records associated with an appointment
+        """
+        appointment = self.get_object()
+        doctor_email = request.query_params.get("email")
+        
+        if not doctor_email:
+            return Response({"error": "Doctor email is required"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        doctor = get_object_or_404(User, email=doctor_email, role='doctor')
+        
+        # Verify that this doctor is associated with this appointment
+        if appointment.doctor != doctor:
+            return Response({"error": "You are not authorized to modify this appointment"}, 
+                           status=status.HTTP_403_FORBIDDEN)
+        
+        # Create medical record with appointment's patient
+        data = request.data.copy()
+        data['user'] = appointment.patient.id
+        
+        serializer = MedicalRecordSerializer(data=data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    @action(detail=True, methods=['post'])
+    def add_medication(self, request, pk=None):
+        """
+        Allow doctors to set medication routines associated with an appointment
+        """
+        appointment = self.get_object()
+        doctor_email = request.query_params.get("email")
+        
+        if not doctor_email:
+            return Response({"error": "Doctor email is required"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        doctor = get_object_or_404(User, email=doctor_email, role='doctor')
+        
+        # Verify that this doctor is associated with this appointment
+        if appointment.doctor != doctor:
+            return Response({"error": "You are not authorized to modify this appointment"}, 
+                           status=status.HTTP_403_FORBIDDEN)
+        
+        # Create medication with appointment's patient
+        data = request.data.copy()
+        data['user'] = appointment.patient.id
+        
+        serializer = MedicationSerializer(data=data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 # Custom permission classes
 class IsDoctor(permissions.BasePermission):
     """
@@ -337,6 +404,7 @@ class MedicalRecordViewSet(viewsets.ModelViewSet):
     Doctors can create/modify medical records.
     Patients can only view their own medical records.
     """
+    queryset = MedicalRecord.objects.all()
     serializer_class = MedicalRecordSerializer
     
     def get_permissions(self):
@@ -351,76 +419,46 @@ class MedicalRecordViewSet(viewsets.ModelViewSet):
         return [permission() for permission in permission_classes]
     
     def get_queryset(self):
-        user = self.request.user
-        
-        # Doctors can see all medical records
-        if user.role == 'doctor':
-            return MedicalRecord.objects.all()
-        # Patients can only see their own records
-        elif user.role == 'patient':
+        # Filter by user_email query parameter if provided
+        user_email = self.request.query_params.get("email")
+        if user_email:
+            user = get_object_or_404(User, email=user_email)
             return MedicalRecord.objects.filter(user=user)
-        return MedicalRecord.objects.none()
+        return MedicalRecord.objects.all()
     
     def perform_create(self, serializer):
-        """Ensure only doctors can create medical records"""
-        if self.request.user.role != 'doctor':
-            return Response(
-                {"detail": "Only doctors can create medical records."},
-                status=status.HTTP_403_FORBIDDEN
-            )
-        serializer.save()
+        """Associate medical record with a specific user"""
+        user_email = self.request.query_params.get("patient_email")
+        if user_email:
+            user = get_object_or_404(User, email=user_email)
+            serializer.save(user=user)
+        else:
+            serializer.save()
 
 class DocumentViewSet(viewsets.ModelViewSet):
     """
     API endpoint for documents.
-    Patients can upload/modify documents.
-    Doctors can view and download documents.
+    Both patients and doctors can upload/view documents.
     """
+    queryset = Document.objects.all()
     serializer_class = DocumentSerializer
     
-    def get_permissions(self):
-        """
-        - Patients can perform create/update/delete operations
-        - Doctors can only list and retrieve
-        """
-        if self.action in ['create', 'update', 'partial_update', 'destroy']:
-            permission_classes = [IsPatient]
-        else:
-            permission_classes = [permissions.IsAuthenticated]
-        return [permission() for permission in permission_classes]
-    
     def get_queryset(self):
-        user = self.request.user
-        
-        # Doctors can view all documents
-        if user.role == 'doctor':
-            return Document.objects.all()
-        # Patients can only see their own documents
-        elif user.role == 'patient':
+        # Filter by user_email query parameter if provided
+        user_email = self.request.query_params.get("email")
+        if user_email:
+            user = get_object_or_404(User, email=user_email)
             return Document.objects.filter(user=user)
-        return Document.objects.none()
+        return Document.objects.all()
     
     def perform_create(self, serializer):
-        """Associate the document with the current user"""
-        serializer.save(user=self.request.user)
-    
-    @action(detail=True, methods=['get'])
-    def download(self, request, pk=None):
-        """
-        Endpoint for doctors to download documents
-        """
-        document = self.get_object()
-        
-        # Only doctors can download
-        if request.user.role != 'doctor':
-            return Response(
-                {"detail": "Only doctors can download documents."},
-                status=status.HTTP_403_FORBIDDEN
-            )
-        
-        # In a real implementation, you would handle the file download here
-        # For this example, we'll just return the file URL
-        return Response({"file_url": document.file_url})
+        """Associate document with a specific user"""
+        user_email = self.request.query_params.get("email")
+        if user_email:
+            user = get_object_or_404(User, email=user_email)
+            serializer.save(user=user)
+        else:
+            serializer.save()
 
 class MedicationViewSet(viewsets.ModelViewSet):
     """
@@ -428,35 +466,179 @@ class MedicationViewSet(viewsets.ModelViewSet):
     Doctors can create/modify medications.
     Patients can only view their prescribed medications.
     """
+    queryset = Medication.objects.all()
     serializer_class = MedicationSerializer
     
-    def get_permissions(self):
-        """
-        - Doctors can perform all operations
-        - Patients can only list and retrieve their own medications
-        """
-        if self.action in ['create', 'update', 'partial_update', 'destroy']:
-            permission_classes = [IsDoctor]
-        else:
-            permission_classes = [permissions.IsAuthenticated]
-        return [permission() for permission in permission_classes]
-    
     def get_queryset(self):
-        user = self.request.user
-        
-        # Doctors can see all medications
-        if user.role == 'doctor':
-            return Medication.objects.all()
-        # Patients can only see their own medications
-        elif user.role == 'patient':
+        # Filter by user_email query parameter if provided
+        user_email = self.request.query_params.get("email")
+        if user_email:
+            user = get_object_or_404(User, email=user_email)
             return Medication.objects.filter(user=user)
-        return Medication.objects.none()
+        return Medication.objects.all()
     
     def perform_create(self, serializer):
-        """Ensure only doctors can create medications"""
-        if self.request.user.role != 'doctor':
-            return Response(
-                {"detail": "Only doctors can prescribe medications."},
-                status=status.HTTP_403_FORBIDDEN
-            )
+        """Associate medication with a specific user"""
+        user_email = self.request.query_params.get("patient_email")
+        if user_email:
+            user = get_object_or_404(User, email=user_email)
+            serializer.save(user=user)
+        else:
+            serializer.save()
+
+@api_view(['GET'])
+def get_user_records(request):
+    """
+    Get all records, documents, and medications for a specific user
+    """
+    user_email = request.query_params.get("email")
+    if not user_email:
+        return Response({"error": "User email is required"}, status=status.HTTP_400_BAD_REQUEST)
+    
+    user = get_object_or_404(User, email=user_email)
+    
+    records = MedicalRecord.objects.filter(user=user)
+    documents = Document.objects.filter(user=user)
+    medications = Medication.objects.filter(user=user)
+
+    record_serializer = MedicalRecordSerializer(records, many=True)
+    document_serializer = DocumentSerializer(documents, many=True)
+    medication_serializer = MedicationSerializer(medications, many=True)
+
+    return Response({
+        'records': record_serializer.data,
+        'documents': document_serializer.data,
+        'medications': medication_serializer.data,
+    })
+
+@api_view(['POST'])
+def patient_upload_document(request):
+    """
+    API endpoint for patients to upload documents
+    """
+    user_email = request.query_params.get("email")
+    if not user_email:
+        return Response({"error": "User email is required"}, status=status.HTTP_400_BAD_REQUEST)
+    
+    user = get_object_or_404(User, email=user_email)
+    
+    # Create document associated with the user
+    data = request.data.copy()
+    data['user'] = user.id
+    
+    serializer = DocumentSerializer(data=data)
+    if serializer.is_valid():
         serializer.save()
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(['POST'])
+def doctor_upload_document(request):
+    """
+    API endpoint for doctors to upload documents for a specific patient
+    """
+    doctor_email = request.query_params.get("doctor_email")
+    patient_email = request.query_params.get("patient_email")
+    
+    if not doctor_email:
+        return Response({"error": "Doctor email is required"}, status=status.HTTP_400_BAD_REQUEST)
+    
+    if not patient_email:
+        return Response({"error": "Patient email is required"}, status=status.HTTP_400_BAD_REQUEST)
+    
+    doctor = get_object_or_404(User, email=doctor_email, role='doctor')
+    patient = get_object_or_404(User, email=patient_email, role='patient')
+    
+    # Create document associated with the patient
+    data = request.data.copy()
+    data['user'] = patient.id
+    
+    serializer = DocumentSerializer(data=data)
+    if serializer.is_valid():
+        serializer.save()
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+class NotificationViewSet(viewsets.ModelViewSet):
+    serializer_class = NotificationSerializer
+    
+    def get_queryset(self):
+        user_email = self.request.query_params.get('user_email', None)
+        if user_email:
+            try:
+                user = User.objects.get(email=user_email)
+                return Notification.objects.filter(user=user).order_by('-created_at')
+            except User.DoesNotExist:
+                return Notification.objects.none()
+        return Notification.objects.none()
+    
+    @action(detail=False, methods=['get'])
+    def unread(self, request):
+        user_email = request.query_params.get('user_email', None)
+        if user_email:
+            try:
+                user = User.objects.get(email=user_email)
+                notifications = Notification.objects.filter(user=user, read=False).order_by('-created_at')
+                serializer = self.get_serializer(notifications, many=True)
+                return Response(serializer.data)
+            except User.DoesNotExist:
+                return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
+        return Response({"error": "User email is required"}, status=status.HTTP_400_BAD_REQUEST)
+    
+    @action(detail=True, methods=['patch'])
+    def mark_read(self, request, pk=None):
+        notification = self.get_object()
+        notification.read = True
+        notification.save()
+        return Response({"status": "notification marked as read"})
+    
+    @action(detail=False, methods=['patch'])
+    def mark_all_read(self, request):
+        user_email = request.query_params.get('user_email', None)
+        if user_email:
+            try:
+                user = User.objects.get(email=user_email)
+                Notification.objects.filter(user=user, read=False).update(read=True)
+                return Response({"status": "all notifications marked as read"})
+            except User.DoesNotExist:
+                return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
+        return Response({"error": "User email is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+# Add a method to generate medication reminders
+@action(detail=False, methods=['get'])
+def generate_medication_reminders(self, request):
+    """Generate medication reminders for active medications"""
+    today = timezone.now().date()
+    
+    # Find all active medications (where today is between start_date and end_date or end_date is null)
+    active_medications = Medication.objects.filter(
+        (models.Q(start_date__lte=today) & 
+         (models.Q(end_date__gte=today) | models.Q(end_date__isnull=True)))
+    )
+    
+    # For each active medication, check if a reminder for today exists
+    # If not, create one based on the frequency
+    reminders_created = 0
+    
+    for med in active_medications:
+        if med.user:
+            # Simple logic - create a daily reminder
+            # In a real app, you'd parse the frequency field to determine timing
+            existing_reminder = Notification.objects.filter(
+                user=med.user,
+                type="reminder",
+                medication=med,
+                created_at__date=today
+            ).exists()
+            
+            if not existing_reminder:
+                Notification.objects.create(
+                    user=med.user,
+                    title=f"Medication Reminder: {med.name}",
+                    message=f"Remember to take {med.name} - {med.dosage}. {med.instructions}",
+                    type="reminder",
+                    medication=med
+                )
+                reminders_created += 1
+    
+    return Response({"status": f"Created {reminders_created} medication reminders"})

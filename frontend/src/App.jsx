@@ -11,7 +11,7 @@ import { store } from "./store/store";
 import { clearAllStoredSessions } from "./store/slices/sessionSlice";
 import Home from "./pages/Home";
 import ChatInterface from "./pages/ChatInterface.jsx";
-import Appointments from "./pages/Appointments2.jsx";
+import Appointments from "./pages/Appointments.jsx";
 import Records from "./pages/Records.jsx";
 import Login from "./pages/Login.jsx";
 import Profile from "./pages/Profile.jsx";

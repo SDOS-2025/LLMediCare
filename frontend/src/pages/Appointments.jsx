@@ -1,896 +1,1513 @@
-// import React, { useState, useEffect } from 'react';
-// import { useSelector, useDispatch } from 'react-redux';
-// // import { setAppointments, setLoading, setError } from '../store/slices/appointment-slice';
-// import styled from 'styled-components';
-// import Header from '../components/Header';
-// import Sidebar from '../components/Sidebar';
-// import { Calendar, momentLocalizer } from 'react-big-calendar';
-// import 'react-big-calendar/lib/css/react-big-calendar.css';
-// import moment from 'moment';
-// import { Dialog, Transition } from '@headlessui/react';
-// import { Fragment } from 'react';
-// import { useGoogleLogin } from '@react-oauth/google';
-// import { toast } from 'react-toastify';
+// The React component for Appointments
 
-// // Set up the localizer for react-big-calendar
-// const localizer = momentLocalizer(moment);
+import React, { useState, useEffect } from "react";
+import axios from "axios";
+import DatePicker from "react-datepicker";
+import "react-datepicker/dist/react-datepicker.css";
+import Header from "../components/Header";
+import Sidebar from "../components/Sidebar";
+import styled from "styled-components";
+import { useSelector } from "react-redux";
+import { FiSearch, FiX, FiPlus, FiPaperclip, FiDownload, FiCheck, FiX as FiXMark } from "react-icons/fi";
 
-// // List of available doctors
-// const doctors = [
-//   { id: 1, name: 'Dr. Jane Smith', specialty: 'General Practitioner', calendarId: 'drjanesmith@example.com' },
-//   { id: 2, name: 'Dr. John Doe', specialty: 'Cardiologist', calendarId: 'drjohndoe@example.com' },
-//   { id: 3, name: 'Dr. Emily Chen', specialty: 'Pediatrician', calendarId: 'dremilychen@example.com' },
-// ];
+export default function Appointments() {
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const currentUser = useSelector((state) => state.user.currentUser);
+  
+  // Appointment form state
+  const [appointmentDate, setAppointmentDate] = useState(new Date());
+  const [startTime, setStartTime] = useState('09:00');
+  const [endTime, setEndTime] = useState('10:00');
+  const [reason, setReason] = useState('');
+  
+  // Document upload
+  const [documents, setDocuments] = useState([]);
+  const [selectedFile, setSelectedFile] = useState(null);
+  
+  // Doctor selection
+  const [doctors, setDoctors] = useState([]);
+  const [selectedDoctor, setSelectedDoctor] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filteredDoctors, setFilteredDoctors] = useState([]);
+  
+  // Appointments list
+  const [appointments, setAppointments] = useState([]);
+  const [message, setMessage] = useState('');
+  
+  // Modals
+  const [showMedicalRecordModal, setShowMedicalRecordModal] = useState(false);
+  const [showMedicationModal, setShowMedicationModal] = useState(false);
+  const [currentAppointment, setCurrentAppointment] = useState(null);
+  
+  // Medical record form state
+  const [recordDate, setRecordDate] = useState(new Date());
+  const [recordType, setRecordType] = useState('');
+  const [findings, setFindings] = useState('');
+  const [recommendations, setRecommendations] = useState('');
+  
+  // Medication form state
+  const [medicationName, setMedicationName] = useState('');
+  const [dosage, setDosage] = useState('');
+  const [frequency, setFrequency] = useState('');
+  const [startDate, setStartDate] = useState(new Date());
+  const [endDate, setEndDate] = useState(new Date(new Date().setDate(new Date().getDate() + 7)));
+  const [instructions, setInstructions] = useState('');
+  
+  // Notifications
+  const [notifications, setNotifications] = useState([]);
+  const [showNotifications, setShowNotifications] = useState(false);
 
-// export default function Appointments() {
-//   const dispatch = useDispatch();
-//   // const { appointments, loading, error } = useSelector((state) => state.appointments);
-//   const user = useSelector((state) => state.auth.user);
-  
-//   const [activeTab, setActiveTab] = useState('upcoming');
-//   const [showBookingForm, setShowBookingForm] = useState(false);
-//   const [selectedDoctor, setSelectedDoctor] = useState(null);
-//   const [selectedSlot, setSelectedSlot] = useState(null);
-//   const [availableSlots, setAvailableSlots] = useState([]);
-//   const [googleToken, setGoogleToken] = useState(null);
-  
-//   // Calendar view state
-//   const [calendarView, setCalendarView] = useState('month');
-//   const [showCalendar, setShowCalendar] = useState(false);
-  
-//   // Sidebar state
-//   const [sidebarOpen, setSidebarOpen] = useState(false);
-  
-//   // Form state
-//   const [appointmentType, setAppointmentType] = useState('in_person');
-//   const [appointmentDate, setAppointmentDate] = useState('');
-//   const [appointmentTime, setAppointmentTime] = useState('');
-//   const [symptoms, setSymptoms] = useState('');
-//   const [doctorNote, setDoctorNote] = useState('');
-  
-//   // Google Login setup
-//   const login = useGoogleLogin({
-//     onSuccess: (tokenResponse) => {
-//       setGoogleToken(tokenResponse.access_token);
-//       fetchAvailableSlots(selectedDoctor, tokenResponse.access_token);
-//     },
-//     onError: (error) => {
-//       console.error('Google Login Error:', error);
-//       toast.error('Failed to connect to Google Calendar. Please try again.');
-//     },
-//     scope: 'https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/calendar.events',
-//   });
-  
-//   const toggleSidebar = () => {
-//     setSidebarOpen(!sidebarOpen);
-//   };
-  
-//   useEffect(() => {
-//     const fetchAppointments = async () => {
-//       if (!user) return;
-      
-//       // dispatch(setLoading(true));
-//       try {
-//         // In a real app, you would fetch appointments from the API
-//         // const response = await fetch('/api/appointments/');
-//         // const data = await response.json();
-        
-//         // For now, we'll use mock data
-//         const mockData = [
-//           {
-//             id: 1,
-//             date: '2025-03-20',
-//             time: '10:00',
-//             type: 'in_person',
-//             status: 'scheduled',
-//             doctor: 'Dr. Jane Smith',
-//             symptoms: 'Fever, cough',
-//             notes: 'Follow-up on previous visit'
-//           },
-//           {
-//             id: 2,
-//             date: '2025-03-25',
-//             time: '14:30',
-//             type: 'virtual',
-//             status: 'scheduled',
-//             doctor: 'Dr. John Doe',
-//             symptoms: 'Headache, fatigue',
-//             notes: 'Initial consultation'
-//           },
-//           {
-//             id: 3,
-//             date: '2025-02-15',
-//             time: '09:15',
-//             type: 'in_person',
-//             status: 'completed',
-//             doctor: 'Dr. Jane Smith',
-//             symptoms: 'Sore throat',
-//             notes: 'Prescribed antibiotics'
-//           }
-//         ];
-        
-//         // dispatch(setAppointments(mockData));
-//       } catch (err) {
-//         console.error('Error fetching appointments:', err);
-//         // dispatch(setError('Failed to load appointments. Please try again.'));
-//       } finally {
-//         // dispatch(setLoading(false));
-//       }
-//     };
+  // Fetch doctors list
+  useEffect(() => {
+    async function fetchDoctors() {
+      try {
+        const response = await axios.get('http://localhost:8000/api/users/doctors/list/');
+        setDoctors(response.data);
+        setFilteredDoctors(response.data);
+        if (response.data.length > 0) {
+          setSelectedDoctor(response.data[0].email);
+        }
+      } catch (error) {
+        console.error('Error fetching doctors:', error);
+      }
+    }
+    fetchDoctors();
+  }, []);
+
+  // Fetch appointments based on user role
+  useEffect(() => {
+    async function fetchAppointments() {
+      if (!currentUser) return;
+
+      try {
+        const response = await axios.get(
+          `http://localhost:8000/api/appointments/user/${currentUser.email}/`
+        );
+        setAppointments(response.data);
+      } catch (error) {
+        console.error('Error fetching appointments:', error);
+      }
+    }
+    fetchAppointments();
+  }, [currentUser, message]);
+
+  // Fetch notifications
+  useEffect(() => {
+    async function fetchNotifications() {
+      if (!currentUser) return;
+
+      try {
+        const response = await axios.get(
+          `http://localhost:8000/api/notifications/unread/?user_email=${currentUser.email}`
+        );
+        setNotifications(response.data);
+      } catch (error) {
+        console.error('Error fetching notifications:', error);
+      }
+    }
+    fetchNotifications();
     
-//     fetchAppointments();
-//   }, [dispatch, user]);
-  
-//   const fetchAvailableSlots = async (doctor, token) => {
-//     if (!doctor || !token) return;
+    // Set up polling for notifications every 60 seconds
+    const interval = setInterval(fetchNotifications, 60000);
+    return () => clearInterval(interval);
+  }, [currentUser]);
+
+  useEffect(() => {
+    // Filter doctors based on search query
+    if (searchQuery) {
+      const filtered = doctors.filter(doctor => 
+        doctor.name.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+      setFilteredDoctors(filtered);
+    } else {
+      setFilteredDoctors(doctors);
+    }
+  }, [searchQuery, doctors]);
+
+  const toggleSidebar = () => {
+    setSidebarOpen(!sidebarOpen);
+  };
+
+  const handleFileChange = (e) => {
+    setSelectedFile(e.target.files[0]);
+  };
+
+  const handleFileUpload = async () => {
+    if (!selectedFile) return;
+
+    const formData = new FormData();
+    formData.append('file', selectedFile);
+    formData.append('title', selectedFile.name);
+    formData.append('type', 'appointment_document');
     
-//     // dispatch(setLoading(true));
-//     try {
-//       // In a real app, you would fetch available slots from the Google Calendar API
-//       // This is a simplified mock implementation
+    try {
+      if (currentUser.role === 'patient') {
+        formData.append('user_email', currentUser.email);
+        await axios.post('http://localhost:8000/api/documents/patient/upload/', formData);
+      } else {
+        formData.append('doctor_email', currentUser.email);
+        formData.append('patient_email', currentAppointment?.patient?.email || '');
+        await axios.post('http://localhost:8000/api/documents/doctor/upload/', formData);
+      }
       
-//       const today = new Date();
-//       const twoWeeksFromNow = new Date();
-//       twoWeeksFromNow.setDate(today.getDate() + 14);
-      
-//       // Simulate API call to fetch the doctor's calendar
-//       const mockSlots = generateMockAvailableSlots(doctor.id, today, twoWeeksFromNow);
-//       setAvailableSlots(mockSlots);
-      
-//       // Set default appointment date to the first available slot
-//       if (mockSlots.length > 0) {
-//         const firstSlot = mockSlots[0];
-//         setAppointmentDate(moment(firstSlot.start).format('YYYY-MM-DD'));
-//         setAppointmentTime(moment(firstSlot.start).format('HH:mm'));
-//       }
-      
-//       setShowCalendar(true);
-//     } catch (err) {
-//       console.error('Error fetching available slots:', err);
-//       toast.error('Failed to fetch available appointment slots. Please try again.');
-//     } finally {
-//       // dispatch(setLoading(false));
-//     }
-//   };
-  
-//   // Helper function to generate mock available slots
-//   const generateMockAvailableSlots = (doctorId, startDate, endDate) => {
-//     const slots = [];
-//     const currentDate = new Date(startDate);
+      setDocuments([...documents, { 
+        title: selectedFile.name, 
+        type: 'appointment_document',
+        date: new Date().toISOString().split('T')[0]
+      }]);
+      setSelectedFile(null);
+      setMessage('Document uploaded successfully.');
+    } catch (error) {
+      console.error('Error uploading document:', error);
+      setMessage('Error uploading document.');
+    }
+  };
+
+  const handleSubmitAppointment = async (e) => {
+    e.preventDefault();
     
-//     while (currentDate <= endDate) {
-//       // Skip weekends
-//       if (currentDate.getDay() !== 0 && currentDate.getDay() !== 6) {
-//         // Morning slots
-//         for (let hour = 9; hour < 12; hour++) {
-//           const slotStart = new Date(currentDate);
-//           slotStart.setHours(hour, 0, 0);
-          
-//           const slotEnd = new Date(slotStart);
-//           slotEnd.setMinutes(slotStart.getMinutes() + 30);
-          
-//           // Random availability (70% chance of being available)
-//           if (Math.random() > 0.3) {
-//             slots.push({
-//               title: 'Available',
-//               start: slotStart,
-//               end: slotEnd,
-//               doctorId: doctorId
-//             });
-//           }
-//         }
-        
-//         // Afternoon slots
-//         for (let hour = 13; hour < 17; hour++) {
-//           const slotStart = new Date(currentDate);
-//           slotStart.setHours(hour, 0, 0);
-          
-//           const slotEnd = new Date(slotStart);
-//           slotEnd.setMinutes(slotStart.getMinutes() + 30);
-          
-//           // Random availability (70% chance of being available)
-//           if (Math.random() > 0.3) {
-//             slots.push({
-//               title: 'Available',
-//               start: slotStart,
-//               end: slotEnd,
-//               doctorId: doctorId
-//             });
-//           }
-//         }
-//       }
-      
-//       // Move to next day
-//       currentDate.setDate(currentDate.getDate() + 1);
-//     }
+    if (!selectedDoctor) {
+      setMessage('Please select a doctor.');
+      return;
+    }
     
-//     return slots;
-//   };
-  
-//   const handleSelectDoctor = (doctor) => {
-//     setSelectedDoctor(doctor);
+    const payload = {
+      doctor_email: selectedDoctor,
+      appointment_date: appointmentDate.toISOString().split('T')[0],
+      start_time: startTime,
+      end_time: endTime,
+      notes: reason,
+      status: 'pending'
+    };
     
-//     if (googleToken) {
-//       fetchAvailableSlots(doctor, googleToken);
-//     } else {
-//       login();
-//     }
-//   };
-  
-//   const handleSelectSlot = (slot) => {
-//     setSelectedSlot(slot);
-//     setAppointmentDate(moment(slot.start).format('YYYY-MM-DD'));
-//     setAppointmentTime(moment(slot.start).format('HH:mm'));
-//   };
-  
-//   const handleBookAppointment = async (e) => {
-//     e.preventDefault();
+    try {
+      await axios.post('http://localhost:8000/api/appointments/', payload);
+      setMessage('Appointment request sent successfully.');
+      
+      // Reset form
+      setAppointmentDate(new Date());
+      setStartTime('09:00');
+      setEndTime('10:00');
+      setReason('');
+      setDocuments([]);
+      
+    } catch (error) {
+      console.error('Error submitting appointment request:', error);
+      setMessage('Error submitting appointment request: ' + JSON.stringify(error.response?.data));
+    }
+  };
+
+  const handleAppointmentAction = async (id, action) => {
+    try {
+      await axios.patch(`http://localhost:8000/api/appointments/${id}/`, {
+        status: action
+      });
+      
+      setMessage(`Appointment ${action === 'accepted' ? 'approved' : 'refused'} successfully.`);
+      
+      // Refresh appointments
+      const response = await axios.get(
+        `http://localhost:8000/api/appointments/user/${currentUser.email}/`
+      );
+      setAppointments(response.data);
+      
+    } catch (error) {
+      console.error(`Error ${action} appointment:`, error);
+      setMessage(`Error ${action} appointment.`);
+    }
+  };
+
+  const openMedicalRecordModal = (appointment) => {
+    setCurrentAppointment(appointment);
+    setShowMedicalRecordModal(true);
+  };
+
+  const openMedicationModal = (appointment) => {
+    setCurrentAppointment(appointment);
+    setShowMedicationModal(true);
+  };
+
+  const handleAddMedicalRecord = async (e) => {
+    e.preventDefault();
     
-//     if (!selectedDoctor || !selectedSlot) {
-//       toast.error('Please select a doctor and appointment slot.');
-//       return;
-//     }
+    if (!currentAppointment) return;
     
-//     // dispatch(setLoading(true));
-//     try {
-//       // In a real app, you would:
-//       // 1. Call the Google Calendar API to create an event
-//       // 2. Set appropriate permissions for the event
-//       // 3. Save the appointment in your database
+    const payload = {
+      user: currentAppointment.patient.id,
+      date: recordDate.toISOString().split('T')[0],
+      type: recordType,
+      doctor: currentUser.name, // Using the logged-in doctor's name
+      findings: findings,
+      recommendations: recommendations
+    };
+    
+    try {
+      await axios.post(`http://localhost:8000/api/appointments/${currentAppointment.id}/add_medical_record/`, payload);
+      setMessage('Medical record added successfully.');
+      setShowMedicalRecordModal(false);
       
-//       // For now, we'll simulate this with a delay
-//       await new Promise(resolve => setTimeout(resolve, 1000));
+      // Reset form
+      setRecordDate(new Date());
+      setRecordType('');
+      setFindings('');
+      setRecommendations('');
       
-//       const newAppointment = {
-//         id: Date.now(), // temporary ID
-//         date: appointmentDate,
-//         time: appointmentTime,
-//         type: appointmentType,
-//         status: 'scheduled',
-//         doctor: selectedDoctor.name,
-//         symptoms,
-//         notes: doctorNote
-//       };
+    } catch (error) {
+      console.error('Error adding medical record:', error);
+      setMessage('Error adding medical record.');
+    }
+  };
+
+  const handleAddMedication = async (e) => {
+    e.preventDefault();
+    
+    if (!currentAppointment) return;
+    
+    const payload = {
+      user: currentAppointment.patient.id,
+      name: medicationName,
+      dosage: dosage,
+      frequency: frequency,
+      start_date: startDate.toISOString().split('T')[0],
+      end_date: endDate.toISOString().split('T')[0],
+      instructions: instructions
+    };
+    
+    try {
+      await axios.post(`http://localhost:8000/api/appointments/${currentAppointment.id}/add_medication/`, payload);
+      setMessage('Medication added successfully.');
+      setShowMedicationModal(false);
       
-//       // dispatch(setAppointments([...appointments, newAppointment]));
+      // Reset form
+      setMedicationName('');
+      setDosage('');
+      setFrequency('');
+      setStartDate(new Date());
+      setEndDate(new Date(new Date().setDate(new Date().getDate() + 7)));
+      setInstructions('');
       
-//       // Remove the booked slot from available slots
-//       const updatedSlots = availableSlots.filter(
-//         slot => !(moment(slot.start).format('YYYY-MM-DD HH:mm') === `${appointmentDate} ${appointmentTime}`)
-//       );
-//       setAvailableSlots(updatedSlots);
+    } catch (error) {
+      console.error('Error adding medication:', error);
+      setMessage('Error adding medication.');
+    }
+  };
+
+  const markNotificationAsRead = async (id) => {
+    try {
+      await axios.patch(`http://localhost:8000/api/notifications/${id}/mark-read/`);
       
-//       toast.success('Appointment booked successfully!');
+      // Update notifications list
+      const response = await axios.get(
+        `http://localhost:8000/api/notifications/unread/?user_email=${currentUser.email}`
+      );
+      setNotifications(response.data);
       
-//       // Reset form
-//       resetForm();
-//     } catch (err) {
-//       console.error('Error booking appointment:', err);
-//       toast.error('Failed to book appointment. Please try again.');
-//     } finally {
-//       // dispatch(setLoading(false));
-//     }
-//   };
-  
-//   const resetForm = () => {
-//     setAppointmentType('in_person');
-//     setAppointmentDate('');
-//     setAppointmentTime('');
-//     setSymptoms('');
-//     setDoctorNote('');
-//     setSelectedDoctor(null);
-//     setSelectedSlot(null);
-//     setShowBookingForm(false);
-//     setShowCalendar(false);
-//   };
-  
-//   const cancelAppointment = async (id) => {
-//     // dispatch(setLoading(true));
-//     try {
-//       // In a real app, you would:
-//       // 1. Call the Google Calendar API to delete or update the event
-//       // 2. Update your database
+    } catch (error) {
+      console.error('Error marking notification as read:', error);
+    }
+  };
+
+  const markAllNotificationsAsRead = async () => {
+    try {
+      await axios.patch(
+        `http://localhost:8000/api/notifications/mark-all-read/?user_email=${currentUser.email}`
+      );
+      setNotifications([]);
       
-//       // For now, we'll simulate this with a delay
-//       await new Promise(resolve => setTimeout(resolve, 500));
-      
-//       // const updatedAppointments = appointments.map(appointment => 
-//       //   appointment.id === id ? { ...appointment, status: 'cancelled' } : appointment
-//       // );
-      
-//       // dispatch(setAppointments(updatedAppointments));
-//       toast.success('Appointment cancelled successfully.');
-//     } catch (err) {
-//       console.error('Error cancelling appointment:', err);
-//       toast.error('Failed to cancel appointment. Please try again.');
-//     } finally {
-//       // dispatch(setLoading(false));
-//     }
-//   };
-  
-//   // const upcomingAppointments = appointments.filter(
-//   //   appointment => appointment.status === 'scheduled'
-//   // );
-  
-//   // const pastAppointments = appointments.filter(
-//   //   appointment => appointment.status === 'completed' || appointment.status === 'cancelled'
-//   // );
-  
-//   // Function to format events for the calendar
-//   const formatCalendarEvents = (slots) => {
-//     return slots.map(slot => ({
-//       ...slot,
-//       title: 'Available',
-//       allDay: false
-//     }));
-//   };
-  
-//   if (loading) {
-//     return (
-//       <AppContainer>
-//         <Header toggleSidebar={toggleSidebar} sidebarOpen={sidebarOpen} />
-//         <Sidebar isOpen={sidebarOpen} setIsOpen={setSidebarOpen} />
-//         <MainContent sidebarOpen={sidebarOpen}>
-//           <div className="flex justify-center py-10">
-//             <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-blue-500"></div>
-//             <span className="ml-3">Loading appointments...</span>
-//           </div>
-//         </MainContent>
-//       </AppContainer>
-//     );
-//   }
-  
-//   if (error) {
-//     return (
-//       <AppContainer>
-//         <Header toggleSidebar={toggleSidebar} sidebarOpen={sidebarOpen} />
-//         <Sidebar isOpen={sidebarOpen} setIsOpen={setSidebarOpen} />
-//         <MainContent sidebarOpen={sidebarOpen}>
-//           <div className="text-red-500 text-center py-10">{error}</div>
-//         </MainContent>
-//       </AppContainer>
-//     );
-//   }
-  
-//   if (!user) {
-//     return (
-//       <AppContainer>
-//         <Header toggleSidebar={toggleSidebar} sidebarOpen={sidebarOpen} />
-//         <Sidebar isOpen={sidebarOpen} setIsOpen={setSidebarOpen} />
-//         <MainContent sidebarOpen={sidebarOpen}>
-//           <AppointmentsContainer>
-//             <HeaderContainer>
-//               <HeaderTitle>Manage Your Appointments</HeaderTitle>
-//               <HeaderDescription>Please sign in to view and manage your appointments.</HeaderDescription>
-//             </HeaderContainer>
-//           </AppointmentsContainer>
-//         </MainContent>
-//       </AppContainer>
-//     );
-//   }
-  
-//   return (
-//     <AppContainer>
-//       <Header toggleSidebar={toggleSidebar} sidebarOpen={sidebarOpen} />
-//       <Sidebar isOpen={sidebarOpen} setIsOpen={setSidebarOpen} />
-//       <MainContent sidebarOpen={sidebarOpen}>
-//         <AppointmentsContainer>
-//           <HeaderContainer>
-//             <HeaderTitle>Manage Your Appointments</HeaderTitle>
-//             <HeaderDescription>Schedule and track appointments with healthcare providers.</HeaderDescription>
-//             <Button onClick={() => setShowBookingForm(true)} className="mb-6">
-//               Book New Appointment
-//             </Button>
-//           </HeaderContainer>
-          
-//           {/* Booking Form Modal */}
-//           <Transition appear show={showBookingForm} as={Fragment}>
-//             <Dialog
-//               as="div"
-//               className="fixed inset-0 z-50 overflow-y-auto"
-//               onClose={() => {
-//                 if (!loading) {
-//                   resetForm();
-//                 }
-//               }}
-//             >
-//               <div className="min-h-screen px-4 text-center">
-//                 <Transition.Child
-//                   as={Fragment}
-//                   enter="ease-out duration-300"
-//                   enterFrom="opacity-0"
-//                   enterTo="opacity-100"
-//                   leave="ease-in duration-200"
-//                   leaveFrom="opacity-100"
-//                   leaveTo="opacity-0"
-//                 >
-//                   <Dialog.Overlay className="fixed inset-0 bg-black opacity-30" />
-//                 </Transition.Child>
+    } catch (error) {
+      console.error('Error marking all notifications as read:', error);
+    }
+  };
+
+  // Render
+  return (
+    <AppContainer>
+      <Header toggleSidebar={toggleSidebar} sidebarOpen={sidebarOpen} />
+      <Sidebar isOpen={sidebarOpen} setIsOpen={setSidebarOpen} />
+
+      <MainContent>
+        <ContentWrapper>
+          <HeaderSection>
+            <PageTitle>
+              {currentUser && currentUser.role === "doctor"
+                ? "Patient Appointments"
+                : "Schedule an Appointment"}
+            </PageTitle>
+            <PageSubtitle>
+              {currentUser && currentUser.role === "doctor"
+                ? "View and manage appointment requests from patients."
+                : "Book a consultation with your preferred doctor."}
+            </PageSubtitle>
+          </HeaderSection>
+
+          {/* Notifications bell */}
+          <NotificationContainer>
+            <NotificationBell onClick={() => setShowNotifications(!showNotifications)}>
+              🔔
+              {notifications.length > 0 && (
+                <NotificationBadge>{notifications.length}</NotificationBadge>
+              )}
+            </NotificationBell>
+            
+            {showNotifications && (
+              <NotificationDropdown>
+                <NotificationHeader>
+                  <h3>Notifications</h3>
+                  {notifications.length > 0 && (
+                    <MarkAllReadButton onClick={markAllNotificationsAsRead}>
+                      Mark all as read
+                    </MarkAllReadButton>
+                  )}
+                </NotificationHeader>
                 
-//                 <span className="inline-block h-screen align-middle" aria-hidden="true">
-//                   &#8203;
-//                 </span>
-                
-//                 <Transition.Child
-//                   as={Fragment}
-//                   enter="ease-out duration-300"
-//                   enterFrom="opacity-0 scale-95"
-//                   enterTo="opacity-100 scale-100"
-//                   leave="ease-in duration-200"
-//                   leaveFrom="opacity-100 scale-100"
-//                   leaveTo="opacity-0 scale-95"
-//                 >
-//                   <div className="inline-block w-full max-w-md p-6 my-8 overflow-hidden text-left align-middle transition-all transform bg-white shadow-xl rounded-lg">
-//                     <Dialog.Title
-//                       as="h3"
-//                       className="text-lg font-medium leading-6 text-gray-900"
-//                     >
-//                       Book New Appointment
-//                     </Dialog.Title>
+                {notifications.length > 0 ? (
+                  <NotificationList>
+                    {notifications.map(notification => (
+                      <NotificationItem key={notification.id}>
+                        <NotificationContent>
+                          <NotificationTitle>{notification.title}</NotificationTitle>
+                          <NotificationMessage>{notification.message}</NotificationMessage>
+                          <NotificationTime>
+                            {new Date(notification.created_at).toLocaleString()}
+                          </NotificationTime>
+                        </NotificationContent>
+                        <MarkReadButton onClick={() => markNotificationAsRead(notification.id)}>
+                          <FiCheck />
+                        </MarkReadButton>
+                      </NotificationItem>
+                    ))}
+                  </NotificationList>
+                ) : (
+                  <NoNotifications>No new notifications</NoNotifications>
+                )}
+              </NotificationDropdown>
+            )}
+          </NotificationContainer>
+
+          <CardContainer>
+            {/* Patient view - Schedule appointment */}
+            {currentUser && currentUser.role === "patient" && (
+              <Form onSubmit={handleSubmitAppointment}>
+                <FormGroup>
+                  <Label htmlFor="doctorSelect">Select Doctor:</Label>
+                  <SearchWrapper>
+                    <SearchInput
+                      type="text"
+                      placeholder="Search doctors..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                    />
+                    <SearchIcon><FiSearch /></SearchIcon>
+                  </SearchWrapper>
+                  
+                  <DoctorList>
+                    {filteredDoctors.map((doctor) => (
+                      <DoctorOption 
+                        key={doctor.email}
+                        selected={selectedDoctor === doctor.email}
+                        onClick={() => setSelectedDoctor(doctor.email)}
+                      >
+                        <DoctorName>{doctor.name}</DoctorName>
+                        <DoctorSpecialty>{doctor.specialty || "General Practitioner"}</DoctorSpecialty>
+                      </DoctorOption>
+                    ))}
+                  </DoctorList>
+                </FormGroup>
+
+                <DateTimeRow>
+                  <DateColumn>
+                    <Label>Appointment Date:</Label>
+                    <CalendarWrapper>
+                      <StyledDatePicker
+                        selected={appointmentDate}
+                        onChange={(date) => setAppointmentDate(date)}
+                        dateFormat="yyyy-MM-dd"
+                        minDate={new Date()}
+                      />
+                    </CalendarWrapper>
+                  </DateColumn>
+                  
+                  <TimeColumn>
+                    <TimeGroup>
+                      <Label htmlFor="startTime">Start Time:</Label>
+                      <TimeInput
+                        type="time"
+                        id="startTime"
+                        value={startTime}
+                        onChange={(e) => setStartTime(e.target.value)}
+                      />
+                    </TimeGroup>
                     
-//                     {!selectedDoctor ? (
-//                       <div className="mt-4">
-//                         <p className="text-sm text-gray-500 mb-4">
-//                           Please select a healthcare provider to view their available slots.
-//                         </p>
-//                         <div className="grid grid-cols-1 gap-4">
-//                           {doctors.map((doctor) => (
-//                             <div
-//                               key={doctor.id}
-//                               className="p-4 border rounded-md cursor-pointer hover:bg-blue-50"
-//                               onClick={() => handleSelectDoctor(doctor)}
-//                             >
-//                               <h4 className="font-medium">{doctor.name}</h4>
-//                               <p className="text-sm text-gray-500">{doctor.specialty}</p>
-//                             </div>
-//                           ))}
-//                         </div>
-//                       </div>
-//                     ) : showCalendar ? (
-//                       <div className="mt-4">
-//                         <div className="flex items-center justify-between mb-4">
-//                           <h4 className="font-medium">{selectedDoctor.name}</h4>
-//                           <button
-//                             type="button"
-//                             className="text-sm text-blue-500 hover:text-blue-700"
-//                             onClick={() => {
-//                               setSelectedDoctor(null);
-//                               setShowCalendar(false);
-//                             }}
-//                           >
-//                             Change Doctor
-//                           </button>
-//                         </div>
+                    <TimeGroup>
+                      <Label htmlFor="endTime">End Time:</Label>
+                      <TimeInput
+                        type="time"
+                        id="endTime"
+                        value={endTime}
+                        onChange={(e) => setEndTime(e.target.value)}
+                      />
+                    </TimeGroup>
+                  </TimeColumn>
+                </DateTimeRow>
+
+                <FormGroup>
+                  <Label htmlFor="reason">Reason for visit:</Label>
+                  <Textarea
+                    id="reason"
+                    value={reason}
+                    onChange={(e) => setReason(e.target.value)}
+                    placeholder="Please describe your symptoms or reason for appointment..."
+                    rows={4}
+                    required
+                  />
+                </FormGroup>
+
+                <FormGroup>
+                  <Label>Upload Documents (Optional):</Label>
+                  <FileUploadContainer>
+                    <FileInput
+                      type="file"
+                      id="document"
+                      onChange={handleFileChange}
+                    />
+                    <UploadButton type="button" onClick={handleFileUpload} disabled={!selectedFile}>
+                      <FiPaperclip /> Upload
+                    </UploadButton>
+                  </FileUploadContainer>
+                  
+                  {documents.length > 0 && (
+                    <DocumentsList>
+                      {documents.map((doc, index) => (
+                        <DocumentItem key={index}>
+                          <DocumentInfo>
+                            <DocumentTitle>{doc.title}</DocumentTitle>
+                            <DocumentDate>{doc.date}</DocumentDate>
+                          </DocumentInfo>
+                          <DocumentActions>
+                            <DocumentButton>
+                              <FiDownload />
+                            </DocumentButton>
+                            <DocumentButton onClick={() => {
+                              const updatedDocs = [...documents];
+                              updatedDocs.splice(index, 1);
+                              setDocuments(updatedDocs);
+                            }}>
+                              <FiX />
+                            </DocumentButton>
+                          </DocumentActions>
+                        </DocumentItem>
+                      ))}
+                    </DocumentsList>
+                  )}
+                </FormGroup>
+
+                <ButtonContainer>
+                  <SubmitButton type="submit">Request Appointment</SubmitButton>
+                </ButtonContainer>
+              </Form>
+            )}
+
+            {/* Doctor view - Appointment requests */}
+            {currentUser && currentUser.role === "doctor" && (
+              <AppointmentRequests>
+                <RequestsHeader>
+                  <RequestsTitle>Appointment Requests</RequestsTitle>
+                </RequestsHeader>
+                
+                {appointments.filter(app => app.status === 'pending').length > 0 ? (
+                  appointments
+                    .filter(app => app.status === 'pending')
+                    .map(appointment => (
+                      <AppointmentCard key={appointment.id}>
+                        <AppointmentHeader>
+                          <PatientName>{appointment.patient.name}</PatientName>
+                          <AppointmentStatus status={appointment.status}>
+                            {appointment.status.toUpperCase()}
+                          </AppointmentStatus>
+                        </AppointmentHeader>
                         
-//                         <div className="mb-4">
-//                           <div className="flex space-x-2 mb-2">
-//                             <button
-//                               type="button"
-//                               className={`px-3 py-1 text-sm rounded ${
-//                                 calendarView === 'month' 
-//                                   ? 'bg-blue-500 text-white'
-//                                   : 'bg-gray-200 text-gray-700'
-//                               }`}
-//                               onClick={() => setCalendarView('month')}
-//                             >
-//                               Month
-//                             </button>
-//                             <button
-//                               type="button"
-//                               className={`px-3 py-1 text-sm rounded ${
-//                                 calendarView === 'week' 
-//                                   ? 'bg-blue-500 text-white'
-//                                   : 'bg-gray-200 text-gray-700'
-//                               }`}
-//                               onClick={() => setCalendarView('week')}
-//                             >
-//                               Week
-//                             </button>
-//                             <button
-//                               type="button"
-//                               className={`px-3 py-1 text-sm rounded ${
-//                                 calendarView === 'day' 
-//                                   ? 'bg-blue-500 text-white'
-//                                   : 'bg-gray-200 text-gray-700'
-//                               }`}
-//                               onClick={() => setCalendarView('day')}
-//                             >
-//                               Day
-//                             </button>
-//                           </div>
-                          
-//                           <div style={{ height: 400 }}>
-//                             <Calendar
-//                               localizer={localizer}
-//                               events={formatCalendarEvents(availableSlots)}
-//                               startAccessor="start"
-//                               endAccessor="end"
-//                               view={calendarView}
-//                               onView={setCalendarView}
-//                               onSelectEvent={handleSelectSlot}
-//                               style={{ height: '100%' }}
-//                               className="rounded border shadow"
-//                             />
-//                           </div>
-//                         </div>
+                        <AppointmentDetails>
+                          <DetailItem>
+                            <DetailLabel>Date:</DetailLabel>
+                            <DetailValue>{appointment.appointment_date}</DetailValue>
+                          </DetailItem>
+                          <DetailItem>
+                            <DetailLabel>Time:</DetailLabel>
+                            <DetailValue>{`${appointment.start_time} - ${appointment.end_time}`}</DetailValue>
+                          </DetailItem>
+                          <DetailItem>
+                            <DetailLabel>Reason:</DetailLabel>
+                            <DetailValue>{appointment.notes}</DetailValue>
+                          </DetailItem>
+                        </AppointmentDetails>
                         
-//                         {selectedSlot && (
-//                           <form onSubmit={handleBookAppointment} className="space-y-4">
-//                             <div>
-//                               <FormLabel>Appointment Date</FormLabel>
-//                               <FormInput
-//                                 type="date"
-//                                 value={appointmentDate}
-//                                 onChange={(e) => setAppointmentDate(e.target.value)}
-//                                 disabled
-//                                 required
-//                               />
-//                             </div>
-                            
-//                             <div>
-//                               <FormLabel>Appointment Time</FormLabel>
-//                               <FormInput
-//                                 type="time"
-//                                 value={appointmentTime}
-//                                 onChange={(e) => setAppointmentTime(e.target.value)}
-//                                 disabled
-//                                 required
-//                               />
-//                             </div>
-                            
-//                             <div>
-//                               <FormLabel>Appointment Type</FormLabel>
-//                               <FormSelect
-//                                 value={appointmentType}
-//                                 onChange={(e) => setAppointmentType(e.target.value)}
-//                               >
-//                                 <option value="in_person">In-Person</option>
-//                                 <option value="virtual">Virtual</option>
-//                               </FormSelect>
-//                             </div>
-                            
-//                             <div>
-//                               <FormLabel>Symptoms or Reason</FormLabel>
-//                               <FormTextarea
-//                                 value={symptoms}
-//                                 onChange={(e) => setSymptoms(e.target.value)}
-//                                 rows="3"
-//                                 required
-//                               />
-//                             </div>
-                            
-//                             <div>
-//                               <FormLabel>Additional Notes for Doctor</FormLabel>
-//                               <FormTextarea
-//                                 value={doctorNote}
-//                                 onChange={(e) => setDoctorNote(e.target.value)}
-//                                 rows="2"
-//                               />
-//                             </div>
-                            
-//                             <FormButtonContainer>
-//                               <Button type="submit" disabled={loading}>
-//                                 {loading ? 'Booking...' : 'Book Appointment'}
-//                               </Button>
-//                               <Button 
-//                                 type="button"
-//                                 variant="outline"
-//                                 onClick={() => resetForm()}
-//                                 disabled={loading}
-//                               >
-//                                 Cancel
-//                               </Button>
-//                             </FormButtonContainer>
-//                           </form>
-//                         )}
-//                       </div>
-//                     ) : (
-//                       <div className="mt-4">
-//                         <p className="text-center py-6">Loading calendar...</p>
-//                       </div>
-//                     )}
-//                   </div>
-//                 </Transition.Child>
-//               </div>
-//             </Dialog>
-//           </Transition>
+                        <ActionButtons>
+                          <ApproveButton onClick={() => handleAppointmentAction(appointment.id, 'accepted')}>
+                            Approve
+                          </ApproveButton>
+                          <DeclineButton onClick={() => handleAppointmentAction(appointment.id, 'refused')}>
+                            Decline
+                          </DeclineButton>
+                        </ActionButtons>
+                      </AppointmentCard>
+                    ))
+                ) : (
+                  <NoAppointments>No pending appointment requests.</NoAppointments>
+                )}
+                
+                <RequestsHeader>
+                  <RequestsTitle>Approved Appointments</RequestsTitle>
+                </RequestsHeader>
+                
+                {appointments.filter(app => app.status === 'accepted').length > 0 ? (
+                  appointments
+                    .filter(app => app.status === 'accepted')
+                    .map(appointment => (
+                      <AppointmentCard key={appointment.id}>
+                        <AppointmentHeader>
+                          <PatientName>{appointment.patient.name}</PatientName>
+                          <AppointmentStatus status={appointment.status}>
+                            {appointment.status.toUpperCase()}
+                          </AppointmentStatus>
+                        </AppointmentHeader>
+                        
+                        <AppointmentDetails>
+                          <DetailItem>
+                            <DetailLabel>Date:</DetailLabel>
+                            <DetailValue>{appointment.appointment_date}</DetailValue>
+                          </DetailItem>
+                          <DetailItem>
+                            <DetailLabel>Time:</DetailLabel>
+                            <DetailValue>{`${appointment.start_time} - ${appointment.end_time}`}</DetailValue>
+                          </DetailItem>
+                          <DetailItem>
+                            <DetailLabel>Reason:</DetailLabel>
+                            <DetailValue>{appointment.notes}</DetailValue>
+                          </DetailItem>
+                        </AppointmentDetails>
+                        
+                        <ActionButtons>
+                          <SecondaryButton onClick={() => openMedicalRecordModal(appointment)}>
+                            Add Medical Record
+                          </SecondaryButton>
+                          <SecondaryButton onClick={() => openMedicationModal(appointment)}>
+                            Add Medication
+                          </SecondaryButton>
+                        </ActionButtons>
+                      </AppointmentCard>
+                    ))
+                ) : (
+                  <NoAppointments>No approved appointments.</NoAppointments>
+                )}
+              </AppointmentRequests>
+            )}
 
-//           <TabContainer>
-//             <TabHeader>
-//               <TabNav>
-//                 <TabButton
-//                   className={activeTab === 'upcoming' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}
-//                   onClick={() => setActiveTab('upcoming')}
-//                 >
-//                   Upcoming Appointments
-//                 </TabButton>
-//                 <TabButton
-//                   className={activeTab === 'past' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}
-//                   onClick={() => setActiveTab('past')}
-//                 >
-//                   Past Appointments
-//                 </TabButton>
-//               </TabNav>
-//             </TabHeader>
-//             <TabContent>
-//               {activeTab === 'upcoming' ? (
-//                 upcomingAppointments && upcomingAppointments.length > 0 ? (
-//                   <AppointmentList>
-//                     {upcomingAppointments.map((appointment) => (
-//                       <AppointmentItem key={appointment.id}>
-//                         <AppointmentInfo>
-//                           <div>
-//                             <p className="font-medium text-gray-900">
-//                               {appointment.date} at {appointment.time}
-//                             </p>
-//                             <p className="text-gray-500">
-//                               {appointment.type === 'in_person' ? 'In-Person' : 'Virtual'} with {appointment.doctor}
-//                             </p>
-//                             <p className="text-sm text-gray-500 mt-1">
-//                               <span className="font-medium">Reason:</span> {appointment.symptoms}
-//                             </p>
-//                             {appointment.notes && (
-//                               <p className="text-sm text-gray-500">
-//                                 <span className="font-medium">Notes:</span> {appointment.notes}
-//                               </p>
-//                             )}
-//                           </div>
-//                           <div>
-//                             <Button
-//                               variant="outline"
-//                               size="sm"
-//                               onClick={() => cancelAppointment(appointment.id)}
-//                               className="text-red-600 border-red-300 hover:bg-red-50"
-//                             >
-//                               Cancel
-//                             </Button>
-//                           </div>
-//                         </AppointmentInfo>
-//                       </AppointmentItem>
-//                     ))}
-//                   </AppointmentList>
-//                 ) : (
-//                   <p className="text-center py-6 text-gray-500">No upcoming appointments.</p>
-//                 )
-//               ) : (
-//                 pastAppointments.length > 0 ? (
-//                   <AppointmentList>
-//                     {pastAppointments.map((appointment) => (
-//                       <AppointmentItem key={appointment.id}>
-//                         <div>
-//                           <div className="flex justify-between">
-//                             <p className="font-medium text-gray-900">
-//                               {appointment.date} at {appointment.time}
-//                             </p>
-//                             <AppointmentStatus
-//                               className={appointment.status === 'completed' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}
-//                             >
-//                               {appointment.status === 'completed' ? 'Completed' : 'Cancelled'}
-//                             </AppointmentStatus>
-//                           </div>
-//                           <p className="text-gray-500">
-//                             {appointment.type === 'in_person' ? 'In-Person' : 'Virtual'} with {appointment.doctor}
-//                           </p>
-//                           <p className="text-sm text-gray-500 mt-1">
-//                             <span className="font-medium">Reason:</span> {appointment.symptoms}
-//                           </p>
-//                           {appointment.notes && (
-//                             <p className="text-sm text-gray-500">
-//                               <span className="font-medium">Notes:</span> {appointment.notes}
-//                             </p>
-//                           )}
-//                         </div>
-//                       </AppointmentItem>
-//                     ))}
-//                   </AppointmentList>
-//                 ) : (
-//                   <p className="text-center py-6 text-gray-500">No past appointments.</p>
-//                 )
-//               )}
-//             </TabContent>
-//           </TabContainer>
-//         </AppointmentsContainer>
-//       </MainContent>
-//     </AppContainer>
-//   );
-// }
+            {/* Patient view - View appointments */}
+            {currentUser && currentUser.role === "patient" && (
+              <AppointmentList>
+                <ListTitle>Your Appointments</ListTitle>
+                
+                {appointments.length > 0 ? (
+                  appointments.map(appointment => (
+                    <AppointmentCard key={appointment.id}>
+                      <AppointmentHeader>
+                        <DoctorName>Dr. {appointment.doctor.name}</DoctorName>
+                        <AppointmentStatus status={appointment.status}>
+                          {appointment.status.toUpperCase()}
+                        </AppointmentStatus>
+                      </AppointmentHeader>
+                      
+                      <AppointmentDetails>
+                        <DetailItem>
+                          <DetailLabel>Date:</DetailLabel>
+                          <DetailValue>{appointment.appointment_date}</DetailValue>
+                        </DetailItem>
+                        <DetailItem>
+                          <DetailLabel>Time:</DetailLabel>
+                          <DetailValue>{`${appointment.start_time} - ${appointment.end_time}`}</DetailValue>
+                        </DetailItem>
+                        <DetailItem>
+                          <DetailLabel>Reason:</DetailLabel>
+                          <DetailValue>{appointment.notes}</DetailValue>
+                        </DetailItem>
+                      </AppointmentDetails>
+                    </AppointmentCard>
+                  ))
+                ) : (
+                  <NoAppointments>No appointments found.</NoAppointments>
+                )}
+              </AppointmentList>
+            )}
 
-// // Styled Components
-// const AppContainer = styled.div`
-//   display: flex;
-//   flex-direction: column;
-//   min-height: 100vh;
-// `;
+            {message && <Message>{message}</Message>}
+          </CardContainer>
+        </ContentWrapper>
+      </MainContent>
 
-// const MainContent = styled.main`
-//   margin-left: ${props => props.sidebarOpen ? '240px' : '72px'};
-//   margin-top: 64px; /* Same as header height */
-//   transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-//   flex: 1;
-// `;
+      {/* Medical Record Modal */}
+      {showMedicalRecordModal && (
+        <Modal>
+          <ModalContent>
+            <ModalHeader>
+              <ModalTitle>Add Medical Record</ModalTitle>
+              <CloseButton onClick={() => setShowMedicalRecordModal(false)}>
+                <FiX />
+              </CloseButton>
+            </ModalHeader>
+            
+            <ModalBody>
+              <Form onSubmit={handleAddMedicalRecord}>
+                <FormGroup>
+                  <Label>Patient:</Label>
+                  <Input 
+                    type="text" 
+                    value={currentAppointment?.patient?.name || ''} 
+                    disabled 
+                  />
+                </FormGroup>
 
-// const AppointmentsContainer = styled.div`
-//   max-width: 1200px;
-//   margin: 0 auto;
-//   padding: 24px;
-//   background-color: #f9fafb;
-// `;
+                <FormGroup>
+                  <Label>Record Date:</Label>
+                  <CalendarWrapper>
+                    <StyledDatePicker
+                      selected={recordDate}
+                      onChange={(date) => setRecordDate(date)}
+                      dateFormat="yyyy-MM-dd"
+                    />
+                  </CalendarWrapper>
+                </FormGroup>
 
-// const HeaderContainer = styled.div`
-//   text-align: center;
-//   margin-bottom: 24px;
-// `;
+                <FormGroup>
+                  <Label htmlFor="recordType">Record Type:</Label>
+                  <Input
+                    type="text"
+                    id="recordType"
+                    value={recordType}
+                    onChange={(e) => setRecordType(e.target.value)}
+                    placeholder="e.g., Consultation, Lab Results, Imaging"
+                    required
+                  />
+                </FormGroup>
 
-// const HeaderTitle = styled.h2`
-//   font-size: 24px;
-//   font-weight: bold;
-//   margin-bottom: 8px;
-//   color: #111827;
-// `;
+                <FormGroup>
+                  <Label htmlFor="findings">Findings:</Label>
+                  <Textarea
+                    id="findings"
+                    value={findings}
+                    onChange={(e) => setFindings(e.target.value)}
+                    placeholder="Clinical findings and observations"
+                    rows={4}
+                    required
+                  />
+                </FormGroup>
 
-// const HeaderDescription = styled.p`
-//   margin-bottom: 16px;
-//   color: #4b5563;
-// `;
+                <FormGroup>
+                  <Label htmlFor="recommendations">Recommendations:</Label>
+                  <Textarea
+                    id="recommendations"
+                    value={recommendations}
+                    onChange={(e) => setRecommendations(e.target.value)}
+                    placeholder="Treatment recommendations and next steps"
+                    rows={4}
+                    required
+                  />
+                </FormGroup>
 
-// const Button = styled.button`
-//   ${props => props.variant === 'outline' 
-//     ? 'background-color: transparent; border: 1px solid #d1d5db; color: #374151;' 
-//     : 'background-color: #3b82f6; border: 1px solid transparent; color: white;'}
+                <ButtonContainer>
+                  <SubmitButton type="submit">Add Record</SubmitButton>
+                  <CancelButton type="button" onClick={() => setShowMedicalRecordModal(false)}>
+                    Cancel
+                  </CancelButton>
+                </ButtonContainer>
+              </Form>
+            </ModalBody>
+          </ModalContent>
+        </Modal>
+      )}
+
+      {/* Medication Modal */}
+      {showMedicationModal && (
+        <Modal>
+          <ModalContent>
+            <ModalHeader>
+              <ModalTitle>Add Medication</ModalTitle>
+              <CloseButton onClick={() => setShowMedicationModal(false)}>
+                <FiX />
+              </CloseButton>
+            </ModalHeader>
+            
+            <ModalBody>
+              <Form onSubmit={handleAddMedication}>
+                <FormGroup>
+                  <Label>Patient:</Label>
+                  <Input 
+                    type="text" 
+                    value={currentAppointment?.patient?.name || ''} 
+                    disabled 
+                  />
+                </FormGroup>
+
+                <FormGroup>
+                  <Label htmlFor="medicationName">Medication Name:</Label>
+                  <Input
+                    type="text"
+                    id="medicationName"
+                    value={medicationName}
+                    onChange={(e) => setMedicationName(e.target.value)}
+                    required
+                  />
+                </FormGroup>
+
+                <FormGroup>
+                  <Label htmlFor="dosage">Dosage:</Label>
+                  <Input
+                    type="text"
+                    id="dosage"
+                    value={dosage}
+                    onChange={(e) => setDosage(e.target.value)}
+                    placeholder="e.g., 500mg, 10ml"
+                    required
+                  />
+                </FormGroup>
+
+                <FormGroup>
+                  <Label htmlFor="frequency">Frequency:</Label>
+                  <Input
+                    type="text"
+                    id="frequency"
+                    value={frequency}
+                    onChange={(e) => setFrequency(e.target.value)}
+                    placeholder="e.g., Twice daily, Every 8 hours"
+                    required
+                  />
+                </FormGroup>
+
+                <DateRow>
+                  <DateColumn>
+                    <Label>Start Date:</Label>
+                    <CalendarWrapper>
+                      <StyledDatePicker
+                        selected={startDate}
+                        onChange={(date) => setStartDate(date)}
+                        dateFormat="yyyy-MM-dd"
+                      />
+                    </CalendarWrapper>
+                  </DateColumn>
+                  
+                  <DateColumn>
+                    <Label>End Date:</Label>
+                    <CalendarWrapper>
+                      <StyledDatePicker
+                        selected={endDate}
+                        onChange={(date) => setEndDate(date)}
+                        dateFormat="yyyy-MM-dd"
+                        minDate={startDate}
+                      />
+                    </CalendarWrapper>
+                  </DateColumn>
+                </DateRow>
+
+                <FormGroup>
+                  <Label htmlFor="instructions">Instructions:</Label>
+                  <Textarea
+                    id="instructions"
+                    value={instructions}
+                    onChange={(e) => setInstructions(e.target.value)}
+                    placeholder="Special instructions for taking this medication"
+                    rows={4}
+                    required
+                  />
+                </FormGroup>
+
+                <ButtonContainer>
+                  <SubmitButton type="submit">Add Medication</SubmitButton>
+                  <CancelButton type="button" onClick={() => setShowMedicationModal(false)}>
+                    Cancel
+                  </CancelButton>
+                </ButtonContainer>
+              </Form>
+            </ModalBody>
+          </ModalContent>
+        </Modal>
+      )}
+    </AppContainer>
+  );
+}
+
+// Styled Components
+const AppContainer = styled.div`
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background: #f3f4f6;
+`;
+
+const MainContent = styled.main`
+  flex: 1;
+  padding: 1.5rem;
+  margin-top: 4rem;
+  position: relative;
+`;
+
+const ContentWrapper = styled.div`
+  max-width: 58rem;
+  margin: 0 auto;
+`;
+
+const HeaderSection = styled.div`
+  margin-bottom: 2rem;
+  text-align: center;
+`;
+
+const PageTitle = styled.h1`
+  font-size: 2rem;
+  font-weight: 700;
+  color: #1f2937;
+  margin-bottom: 0.5rem;
+`;
+
+const PageSubtitle = styled.p`
+  color: #6b7280;
+  font-size: 1rem;
+`;
+
+const CardContainer = styled.div`
+  background-color: #fff;
+  border-radius: 0.5rem;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+  padding: 1.5rem;
+`;
+
+// Form Elements
+const Form = styled.form`
+  display: flex;
+  flex-direction: column;
+`;
+
+const FormGroup = styled.div`
+  margin-bottom: 1rem;
+`;
+
+const Label = styled.label`
+  font-weight: 500;
+  margin-bottom: 0.5rem;
+  display: block;
+  color: #374151;
+`;
+
+const Input = styled.input`
+  width: 100%;
+  padding: 0.5rem;
+  border: 1px solid #d1d5db;
+  border-radius: 0.375rem;
+  box-sizing: border-box;
+  &:focus {
+    outline: none;
+    border-color: #3b82f6;
+  }
+`;
+
+const Textarea = styled.textarea`
+  width: 100%;
+  padding: 0.5rem;
+  border: 1px solid #d1d5db;
+  border-radius: 0.375rem;
+  box-sizing: border-box;
+  &:focus {
+    outline: none;
+    border-color: #3b82f6;
+  }
+`;
+
+const DateTimeRow = styled.div`
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1rem;
+`;
+
+const DateColumn = styled.div`
+  flex: 1;
+`;
+
+const TimeColumn = styled.div`
+  flex: 1;
+  display: flex;
+  gap: 1rem;
+`;
+
+const TimeGroup = styled.div`
+  flex: 1;
+`;
+
+const TimeInput = styled.input`
+  width: 100%;
+  padding: 0.5rem;
+  border: 1px solid #d1d5db;
+  border-radius: 0.375rem;
+  box-sizing: border-box;
+  &:focus {
+    outline: none;
+    border-color: #3b82f6;
+  }
+`;
+
+const CalendarWrapper = styled.div`
+  width: 100%;
+  .react-datepicker-wrapper {
+    width: 100%;
+    display: block;
+  }
+`;
+
+const StyledDatePicker = styled(DatePicker)`
+  width: 100%;
+  padding: 0.5rem;
+  border: 1px solid #d1d5db;
+  border-radius: 0.375rem;
+  box-sizing: border-box;
+  &:focus {
+    outline: none;
+    border-color: #3b82f6;
+  }
+`;
+
+const ButtonContainer = styled.div`
+  display: flex;
+  gap: 1rem;
+  margin-top: 1rem;
+`;
+
+const SubmitButton = styled.button`
+  padding: 0.625rem 1.25rem;
+  background-color: #3b82f6;
+  color: white;
+  border: none;
+  border-radius: 0.375rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s;
   
-//   ${props => props.size === 'sm' 
-//     ? 'padding: 0.375rem 0.75rem; font-size: 0.875rem;' 
-//     : 'padding: 0.5rem 1rem; font-size: 0.875rem;'}
+  &:hover {
+    background-color: #2563eb;
+  }
   
-//   border-radius: 0.375rem;
-//   font-weight: 500;
-//   cursor: pointer;
-//   display: inline-flex;
-//   align-items: center;
-//   justify-content: center;
-//   transition: all 0.2s;
+  &:focus {
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.5);
+  }
+`;
+
+const CancelButton = styled.button`
+  padding: 0.625rem 1.25rem;
+  background-color: #f3f4f6;
+  color: #4b5563;
+  border: 1px solid #d1d5db;
+  border-radius: 0.375rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s;
   
-//   &:hover {
-//     ${props => props.variant === 'outline' 
-//       ? 'background-color: #f3f4f6;' 
-//       : 'background-color: #2563eb;'}
-//   }
+  &:hover {
+    background-color: #e5e7eb;
+  }
   
-//   &:focus {
-//     outline: 2px solid transparent;
-//     outline-offset: 2px;
-//     box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.5);
-//   }
+  &:focus {
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(209, 213, 219, 0.5);
+  }
+`;
+
+// Doctor selection
+const SearchWrapper = styled.div`
+  position: relative;
+  margin-bottom: 0.75rem;
+`;
+
+const SearchInput = styled.input`
+  width: 100%;
+  padding: 0.5rem 2.5rem 0.5rem 0.75rem;
+  border: 1px solid #d1d5db;
+  border-radius: 0.375rem;
+  box-sizing: border-box;
   
-//   &:disabled {
-//     opacity: 0.5;
-//     cursor: not-allowed;
-//   }
-// `;
+  &:focus {
+    outline: none;
+    border-color: #3b82f6;
+  }
+`;
 
-// const TabContainer = styled.div`
-//   margin-top: 24px;
-//   background-color: white;
-//   border-radius: 8px;
-//   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-//   overflow: hidden;
-// `;
+const SearchIcon = styled.div`
+  position: absolute;
+  right: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #9ca3af;
+`;
 
-// const TabHeader = styled.div`
-//   border-bottom: 1px solid #e5e7eb;
-// `;
+const DoctorList = styled.div`
+  max-height: 15rem;
+  overflow-y: auto;
+  border: 1px solid #d1d5db;
+  border-radius: 0.375rem;
+`;
 
-// const TabNav = styled.nav`
-//   display: flex;
-// `;
-
-// const TabButton = styled.button`
-//   padding: 16px;
-//   border-bottom: 2px solid;
-//   font-weight: 500;
-//   background-color: transparent;
-//   cursor: pointer;
-//   transition: all 0.2s;
-// `;
-
-// const TabContent = styled.div`
-//   padding: 16px;
-// `;
-
-// const AppointmentList = styled.ul`
-//   list-style: none;
-//   margin: 0;
-//   padding: 0;
-// `;
-
-// const AppointmentItem = styled.li`
-//   padding: 16px;
-//   border-bottom: 1px solid #e5e7eb;
+const DoctorOption = styled.div`
+  padding: 0.75rem;
+  cursor: pointer;
+  border-bottom: 1px solid #e5e7eb;
+  background-color: ${props => props.selected ? '#f3f4f6' : 'transparent'};
   
-//   &:last-child {
-//     border-bottom: none;
-//   }
-// `;
-
-// const AppointmentInfo = styled.div`
-//   display: flex;
-//   justify-content: space-between;
-//   align-items: center;
-// `;
-
-// const AppointmentStatus = styled.span`
-//   display: inline-block;
-//   padding: 2px 8px;
-//   border-radius: 9999px;
-//   font-size: 0.75rem;
-//   font-weight: 500;
-// `;
-
-// const FormLabel = styled.label`
-//   display: block;
-//   font-size: 14px;
-//   font-weight: 500;
-//   color: #374151;
-//   margin-bottom: 4px;
-// `;
-
-// const FormInput = styled.input`
-//   width: 100%;
-//   padding: 8px 12px;
-//   border: 1px solid #d1d5db;
-//   border-radius: 0.375rem;
-//   font-size: 14px;
-//   color: #374151;
-//   background-color: white;
+  &:last-child {
+    border-bottom: none;
+  }
   
-//   &:focus {
-//     outline: none;
-//     border-color: #3b82f6;
-//     box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.25);
-//   }
-  
-//   &:disabled {
-//     background-color: #f3f4f6;
-//     cursor: not-allowed;
-//   }
-// `;
+  &:hover {
+    background-color: #f9fafb;
+  }
+`;
 
-// const FormSelect = styled.select`
-//   width: 100%;
-//   padding: 8px 12px;
-//   border: 1px solid #d1d5db;
-//   border-radius: 0.375rem;
-//   font-size: 14px;
-//   color: #374151;
-//   background-color: white;
-  
-//   &:focus {
-//     outline: none;
-//     border-color: #3b82f6;
-//     box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.25);
-//   }
-// `;
+const DoctorName = styled.div`
+  font-weight: 500;
+  margin-bottom: 0.25rem;
+`;
 
-// const FormTextarea = styled.textarea`
-//   width: 100%;
-//   padding: 8px 12px;
-//   border: 1px solid #d1d5db;
-//   border-radius: 0.375rem;
-//   font-size: 14px;
-//   color: #374151;
-//   background-color: white;
-//   resize: vertical;
-  
-//   &:focus {
-//     outline: none;
-//     border-color: #3b82f6;
-//     box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.25);
-//   }
-// `;
+const DoctorSpecialty = styled.div`
+  font-size: 0.875rem;
+  color: #6b7280;
+`;
 
-// const FormButtonContainer = styled.div`
-//   display: flex;
-//   gap: 8px;
-//   justify-content: flex-end;
-//   margin-top: 16px;
-// `;
+// File Upload
+const FileUploadContainer = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 0.5rem;
+`;
+
+const FileInput = styled.input`
+  flex: 1;
+`;
+
+const UploadButton = styled.button`
+  padding: 0.375rem 0.75rem;
+  background-color: #e5e7eb;
+  color: #374151;
+  border: none;
+  border-radius: 0.375rem;
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.875rem;
+  cursor: pointer;
+  
+  &:hover {
+    background-color: #d1d5db;
+  }
+  
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+`;
+
+const DocumentsList = styled.div`
+  margin-top: 0.75rem;
+`;
+
+const DocumentItem = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 0.75rem;
+  background-color: #f9fafb;
+  border-radius: 0.375rem;
+  margin-bottom: 0.5rem;
+`;
+
+const DocumentInfo = styled.div`
+  flex: 1;
+`;
+
+const DocumentTitle = styled.div`
+  font-size: 0.875rem;
+  font-weight: 500;
+`;
+
+const DocumentDate = styled.div`
+  font-size: 0.75rem;
+  color: #6b7280;
+`;
+
+const DocumentActions = styled.div`
+  display: flex;
+  gap: 0.5rem;
+`;
+
+const DocumentButton = styled.button`
+  background: none;
+  border: none;
+  color: #6b7280;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.25rem;
+  
+  &:hover {
+    color: #4b5563;
+  }
+`;
+
+// Appointments
+const AppointmentRequests = styled.div`
+  margin-top: 1rem;
+`;
+
+const RequestsHeader = styled.div`
+  margin: 1.5rem 0 1rem;
+  border-bottom: 1px solid #e5e7eb;
+  padding-bottom: 0.5rem;
+`;
+
+const RequestsTitle = styled.h2`
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #1f2937;
+`;
+
+const AppointmentList = styled.div`
+  margin-top: 2rem;
+`;
+
+const ListTitle = styled.h2`
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #1f2937;
+  margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid #e5e7eb;
+`;
+
+const AppointmentCard = styled.div`
+  border: 1px solid #e5e7eb;
+  border-radius: 0.5rem;
+  padding: 1rem;
+  margin-bottom: 1rem;
+  background-color: #fff;
+`;
+
+const AppointmentHeader = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+`;
+
+const PatientName = styled.h3`
+  font-size: 1rem;
+  font-weight: 600;
+  color: #1f2937;
+`;
+
+const DoctorNameH = styled.h3`
+  font-size: 1rem;
+  font-weight: 600;
+  color: #1f2937;
+`;
+
+const AppointmentStatus = styled.span`
+  font-size: 0.75rem;
+  font-weight: 500;
+  padding: 0.25rem 0.5rem;
+  border-radius: 9999px;
+  
+  ${props => {
+    if (props.status === 'pending') {
+      return `
+        background-color: #fef3c7;
+        color: #92400e;
+      `;
+    } else if (props.status === 'accepted') {
+      return `
+        background-color: #d1fae5;
+        color: #065f46;
+      `;
+    } else if (props.status === 'refused') {
+      return `
+        background-color: #fee2e2;
+        color: #b91c1c;
+      `;
+    }
+  }}
+`;
+
+const AppointmentDetails = styled.div`
+  margin-bottom: 1rem;
+`;
+
+const DetailItem = styled.div`
+  display: flex;
+  margin-bottom: 0.5rem;
+  font-size: 0.875rem;
+`;
+
+const DetailLabel = styled.div`
+  width: 5rem;
+  font-weight: 500;
+  color: #6b7280;
+`;
+
+const DetailValue = styled.div`
+  flex: 1;
+  color: #1f2937;
+`;
+
+const ActionButtons = styled.div`
+  display: flex;
+  gap: 0.75rem;
+`;
+
+const ApproveButton = styled.button`
+  padding: 0.375rem 0.75rem;
+  background-color: #10b981;
+  color: white;
+  border: none;
+  border-radius: 0.375rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  
+  &:hover {
+    background-color: #059669;
+  }
+`;
+
+const DeclineButton = styled.button`
+  padding: 0.375rem 0.75rem;
+  background-color: #ef4444;
+  color: white;
+  border: none;
+  border-radius: 0.375rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  
+  &:hover {
+    background-color: #dc2626;
+  }
+`;
+
+const SecondaryButton = styled.button`
+  padding: 0.375rem 0.75rem;
+  background-color: #f3f4f6;
+  color: #4b5563;
+  border: 1px solid #d1d5db;
+  border-radius: 0.375rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  
+  &:hover {
+    background-color: #e5e7eb;
+  }
+`;
+
+const NoAppointments = styled.div`
+  text-align: center;
+  padding: 2rem 0;
+  color: #6b7280;
+  font-style: italic;
+`;
+
+const Message = styled.div`
+  margin-top: 1rem;
+  padding: 0.75rem;
+  border-radius: 0.375rem;
+  text-align: center;
+  background-color: #f3f4f6;
+  color: #1f2937;
+`;
+
+// Modals
+const Modal = styled.div`
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+`;
+
+const ModalContent = styled.div`
+  background-color: white;
+  border-radius: 0.5rem;
+  width: 90%;
+  max-width: 36rem;
+  max-height: 90vh;
+  overflow-y: auto;
+`;
+
+const ModalHeader = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid #e5e7eb;
+`;
+
+const ModalTitle = styled.h2`
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #1f2937;
+`;
+
+const CloseButton = styled.button`
+  background: none;
+  border: none;
+  color: #6b7280;
+  cursor: pointer;
+  font-size: 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  
+  &:hover {
+    color: #1f2937;
+  }
+`;
+
+const ModalBody = styled.div`
+  padding: 1.5rem;
+`;
+
+const DateRow = styled.div`
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1rem;
+`;
+
+// Notifications
+const NotificationContainer = styled.div`
+  position: absolute;
+  top: 1rem;
+  right: 1.5rem;
+`;
+
+const NotificationBell = styled.button`
+  position: relative;
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  padding: 0.5rem;
+`;
+
+const NotificationBadge = styled.span`
+  position: absolute;
+  top: 0;
+  right: 0;
+  background-color: #ef4444;
+  color: white;
+  font-size: 0.75rem;
+  width: 1.25rem;
+  height: 1.25rem;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+`;
+
+const NotificationDropdown = styled.div`
+  position: absolute;
+  right: 0;
+  top: 2.75rem;
+  width: 22rem;
+  background-color: white;
+  border-radius: 0.5rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  z-index: 10;
+`;
+
+const NotificationHeader = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid #e5e7eb;
+`;
+
+const MarkAllReadButton = styled.button`
+  background: none;
+  border: none;
+  color: #3b82f6;
+  font-size: 0.75rem;
+  font-weight: 500;
+  cursor: pointer;
+  
+  &:hover {
+    color: #2563eb;
+  }
+`;
+
+const NotificationList = styled.div`
+  max-height: 20rem;
+  overflow-y: auto;
+`;
+
+const NotificationItem = styled.div`
+  display: flex;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid #e5e7eb;
+  
+  &:last-child {
+    border-bottom: none;
+  }
+`;
+
+const NotificationContent = styled.div`
+  flex: 1;
+  padding-right: 0.75rem;
+`;
+
+const NotificationTitle = styled.div`
+  font-weight: 500;
+  font-size: 0.875rem;
+  margin-bottom: 0.25rem;
+`;
+
+const NotificationMessage = styled.div`
+  font-size: 0.875rem;
+  color: #4b5563;
+  margin-bottom: 0.25rem;
+`;
+
+const NotificationTime = styled.div`
+  font-size: 0.75rem;
+  color: #9ca3af;
+`;
+
+const MarkReadButton = styled.button`
+  background: none;
+  border: none;
+  color: #6b7280;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  
+  &:hover {
+    color: #3b82f6;
+  }
+`;
+
+const NoNotifications = styled.div`
+  padding: 1.5rem;
+  text-align: center;
+  color: #6b7280;
+  font-style: italic;
+`;
