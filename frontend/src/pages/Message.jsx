@@ -1,22 +1,29 @@
-import React, { useState } from 'react';
-import styled from 'styled-components';
-import { Link } from 'react-router-dom';
-import Header from '../components/Header';
-import Sidebar from '../components/Sidebar';
+import React, { useState, useEffect } from "react";
+import styled from "styled-components";
+import { Link } from "react-router-dom";
+import Header from "../components/Header";
+import Sidebar from "../components/Sidebar";
+import { useSelector } from "react-redux";
 
-export default function ChatArea () {
+export default function ChatArea() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const matrixRoomLink = "https://matrix.to/#/!yUmBJwCJzFjGYECrxx:matrix.org?via=matrix.org"; // replace this!
+  const matrixRoomLink =
+    "https://matrix.to/#/!yUmBJwCJzFjGYECrxx:matrix.org?via=matrix.org"; // replace this!
+  const currentUser = useSelector((state) => state.user.currentUser);
 
   const toggleSidebar = () => {
     setSidebarOpen(!sidebarOpen);
   };
 
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
+
   return (
     <AppContainer>
       <Header toggleSidebar={toggleSidebar} sidebarOpen={sidebarOpen} />
       <Sidebar isOpen={sidebarOpen} setIsOpen={setSidebarOpen} />
-      
+
       <MainContent>
         <ChatContainer>
           <ChatSection>
@@ -24,15 +31,28 @@ export default function ChatArea () {
               <div className="text-center">
                 <ChatTitle>Community Chat</ChatTitle>
                 <ChatText>
-                  Click the button below to join our secure Matrix-based chat room.
-                  Connect with healthcare professionals and other patients.
+                  Click the button below to join our secure Matrix-based chat
+                  room. Connect with healthcare professionals and other
+                  patients.
                 </ChatText>
                 <div className="mt-10 flex items-center justify-center gap-x-6">
-                  <a href={matrixRoomLink} target="_blank" rel="noopener noreferrer">
+                  <a
+                    href={matrixRoomLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
                     <Button size="lg">Join Chat Room</Button>
                   </a>
-                  <Link to="/home">
-                    <Button variant="outline" size="lg">Back to Home</Button>
+                  <Link
+                    to={
+                      currentUser?.role === "doctor"
+                        ? "/doctor-dashboard"
+                        : "/home"
+                    }
+                  >
+                    <Button variant="outline" size="lg">
+                      Back to Dashboard
+                    </Button>
                   </Link>
                 </div>
               </div>
@@ -42,7 +62,7 @@ export default function ChatArea () {
       </MainContent>
     </AppContainer>
   );
-};
+}
 
 const AppContainer = styled.div`
   display: flex;
@@ -89,15 +109,18 @@ const Button = styled.button`
   border-radius: 0.375rem;
   transition: all 0.2s ease-in-out;
   cursor: pointer;
-  
-  ${props => props.variant === 'outline' ? `
+
+  ${(props) =>
+    props.variant === "outline"
+      ? `
     background-color: transparent;
     border: 1px solid #2563eb;
     color: #2563eb;
     &:hover {
       background-color: rgba(37, 99, 235, 0.1);
     }
-  ` : `
+  `
+      : `
     background-color: #2563eb;
     border: 1px solid #2563eb;
     color: white;
@@ -105,9 +128,4 @@ const Button = styled.button`
       background-color: #1d4ed8;
     }
   `}
-  
-  ${props => props.size === 'lg' ? `
-    padding: 0.75rem 1.5rem;
-    font-size: 1.125rem;
-  ` : ''}
 `;

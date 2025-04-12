@@ -3,10 +3,12 @@ import styled from 'styled-components';
 import Header from '../components/Header';
 import Sidebar from '../components/Sidebar';
 import { useSelector } from 'react-redux';
+import { useNavigate } from 'react-router-dom';
 
 export default function DoctorDashboard() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const currentUser = useSelector((state) => state.user.currentUser);
+  const navigate = useNavigate();
 
   const toggleSidebar = () => {
     setSidebarOpen(!sidebarOpen);
@@ -14,7 +16,34 @@ export default function DoctorDashboard() {
 
   useEffect(() => {
     window.scrollTo(0, 0);
-  }, []);
+    // Check if user is a doctor
+    if (!currentUser || currentUser.role !== 'doctor') {
+      navigate('/login');
+    }
+  }, [currentUser, navigate]);
+
+  const handleCardClick = (action) => {
+    switch (action) {
+      case 'appointments':
+        navigate('/doctor/appointments');
+        break;
+      case 'patients':
+        navigate('/doctor/patients');
+        break;
+      case 'records':
+        navigate('/doctor/records');
+        break;
+      case 'chat':
+        navigate('/doctor/chat');
+        break;
+      default:
+        break;
+    }
+  };
+
+  if (!currentUser || currentUser.role !== 'doctor') {
+    return null;
+  }
 
   return (
     <AppContainer>
@@ -27,28 +56,28 @@ export default function DoctorDashboard() {
         </DashboardHeader>
 
         <DashboardGrid>
-          <DashboardCard>
+          <DashboardCard onClick={() => handleCardClick('appointments')}>
             <CardIcon>📅</CardIcon>
             <CardTitle>Appointments</CardTitle>
             <CardDescription>View and manage your appointments</CardDescription>
             <CardButton>View Appointments</CardButton>
           </DashboardCard>
 
-          <DashboardCard>
+          <DashboardCard onClick={() => handleCardClick('patients')}>
             <CardIcon>👥</CardIcon>
             <CardTitle>Patients</CardTitle>
             <CardDescription>Access your patient records</CardDescription>
             <CardButton>View Patients</CardButton>
           </DashboardCard>
 
-          <DashboardCard>
+          <DashboardCard onClick={() => handleCardClick('records')}>
             <CardIcon>📝</CardIcon>
             <CardTitle>Medical Records</CardTitle>
             <CardDescription>Review and update medical records</CardDescription>
             <CardButton>View Records</CardButton>
           </DashboardCard>
 
-          <DashboardCard>
+          <DashboardCard onClick={() => handleCardClick('chat')}>
             <CardIcon>💬</CardIcon>
             <CardTitle>Chat</CardTitle>
             <CardDescription>Communicate with patients</CardDescription>
@@ -104,12 +133,13 @@ const DashboardCard = styled.div`
   background: white;
   border-radius: 12px;
   padding: 1.5rem;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   transition: transform 0.2s ease, box-shadow 0.2s ease;
+  cursor: pointer;
 
   &:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    transform: translateY(-4px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
   }
 `;
 
@@ -127,21 +157,21 @@ const CardTitle = styled.h3`
 
 const CardDescription = styled.p`
   color: #666;
-  margin-bottom: 1.5rem;
-  font-size: 0.95rem;
+  margin-bottom: 1rem;
+  font-size: 0.9rem;
 `;
 
 const CardButton = styled.button`
   background-color: #3a86ff;
   color: white;
-  padding: 0.75rem 1.5rem;
-  border-radius: 8px;
   border: none;
-  font-weight: 500;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  font-size: 0.9rem;
   cursor: pointer;
   transition: background-color 0.2s ease;
 
   &:hover {
-    background-color: #2667ff;
+    background-color: #2667cc;
   }
 `; 
