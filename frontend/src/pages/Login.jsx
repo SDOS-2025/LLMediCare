@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from "react";
 import styled from "styled-components";
 import { auth } from "../utils/firebase-config";
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from "firebase/auth";
+import {
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+} from "firebase/auth";
 import { useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { createUser, fetchUserDetails } from "../store/slices/userSlice";
@@ -16,9 +19,8 @@ export default function Login() {
   const [role, setRole] = useState("patient"); // Default role
   const navigate = useNavigate();
   const dispatch = useDispatch();
+  const currentUser = useSelector((state) => state.user.currentUser);
 
-  // const currentUser = useSelector((state) => state.user.selectedUser);
-  
   useEffect(() => {
     window.scrollTo(0, 0);
   }, []);
@@ -27,7 +29,16 @@ export default function Login() {
     e.preventDefault();
     try {
       await signInWithEmailAndPassword(auth, email, password);
-      await dispatch(fetchUserDetails(email)).unwrap();
+      const userData = await dispatch(fetchUserDetails(email)).unwrap();
+
+      // Check if the user's role matches the selected role
+      if (userData.role !== role) {
+        setMessage(
+          `Error: You are registered as a ${userData.role}, not a ${role}`
+        );
+        return;
+      }
+
       setMessage(`Welcome!`);
       // Redirect based on role
       if (role === "doctor") {
@@ -40,12 +51,6 @@ export default function Login() {
     }
   };
 
-  // useEffect(() => {
-  //   if (currentUser) {
-  //     console.log(currentUser);
-  //   }
-  // }, [currentUser]); 
-
   const handleSignupSubmit = async (e) => {
     e.preventDefault();
     if (password !== confirmPassword) {
@@ -54,12 +59,14 @@ export default function Login() {
     }
 
     try {
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      // const user = userCredential.user;
-  
-      const userData = { name, email, role }; // Include role in user data
+      const userCredential = await createUserWithEmailAndPassword(
+        auth,
+        email,
+        password
+      );
+      const userData = { name, email, role };
       await dispatch(createUser(userData)).unwrap();
-  
+
       setMessage("Registration successful! Go to the Login tab to login.");
       setActiveTab("login");
     } catch (error) {
@@ -91,7 +98,13 @@ export default function Login() {
             Sign Up
           </button>
         </div>
-        {message && <MessageBox className={message.includes("Error") ? "error" : "success"}>{message}</MessageBox>}
+        {message && (
+          <MessageBox
+            className={message.includes("Error") ? "error" : "success"}
+          >
+            {message}
+          </MessageBox>
+        )}
         {activeTab === "login" && (
           <form className="form" onSubmit={handleLoginSubmit}>
             <RoleSelector>
@@ -113,18 +126,18 @@ export default function Login() {
             <InputField
               type="email"
               placeholder="Email"
-              required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              required
             />
             <InputField
               type="password"
               placeholder="Password"
-              required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              required
             />
-            <ActionButton type="submit">Login</ActionButton>
+            <SubmitButton type="submit">Login</SubmitButton>
           </form>
         )}
         {activeTab === "signup" && (
@@ -147,33 +160,33 @@ export default function Login() {
             </RoleSelector>
             <InputField
               type="text"
-              placeholder="Name"
-              required
+              placeholder="Full Name"
               value={name}
               onChange={(e) => setName(e.target.value)}
+              required
             />
             <InputField
               type="email"
               placeholder="Email"
-              required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              required
             />
             <InputField
               type="password"
               placeholder="Password"
-              required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              required
             />
             <InputField
               type="password"
               placeholder="Confirm Password"
-              required
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
+              required
             />
-            <ActionButton type="submit">Sign Up</ActionButton>
+            <SubmitButton type="submit">Sign Up</SubmitButton>
           </form>
         )}
       </Content>
@@ -187,7 +200,7 @@ const Container = styled.div`
   justify-content: center;
   align-items: center;
   position: relative;
-  font-family: 'Inter', 'Segoe UI', sans-serif;
+  font-family: "Inter", "Segoe UI", sans-serif;
   background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
 `;
 
@@ -225,7 +238,7 @@ const Content = styled.div`
   }
 
   .tab.active::after {
-    content: '';
+    content: "";
     position: absolute;
     bottom: -9px;
     left: 0;
@@ -270,7 +283,7 @@ const InputField = styled.input`
   }
 `;
 
-const ActionButton = styled.button`
+const SubmitButton = styled.button`
   background-color: #3a86ff;
   color: white;
   font-size: 1rem;
@@ -298,13 +311,13 @@ const MessageBox = styled.div`
   border-radius: 8px;
   margin-bottom: 1rem;
   font-size: 0.95rem;
-  
+
   &.error {
     background-color: #ffebee;
     color: #d32f2f;
     border: 1px solid #ffcdd2;
   }
-  
+
   &.success {
     background-color: #e8f5e9;
     color: #2e7d32;

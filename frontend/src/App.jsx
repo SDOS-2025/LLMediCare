@@ -1,12 +1,11 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect } from "react";
 import {
   BrowserRouter as Router,
   Routes,
   Route,
   Navigate,
-  useLocation,
 } from "react-router-dom";
-import { Provider, useDispatch } from "react-redux";
+import { Provider } from "react-redux";
 import { store } from "./store/store";
 import { clearAllStoredSessions } from "./store/slices/sessionSlice";
 import Home from "./pages/Home";
@@ -17,43 +16,8 @@ import Login from "./pages/Login.jsx";
 import Profile from "./pages/Profile.jsx";
 import DoctorDashboard from "./pages/DoctorDashboard.jsx";
 import Message from "./pages/Message.jsx";
-import { auth } from "./utils/firebase-config.js";
-import { onAuthStateChanged } from "firebase/auth";
+import ProtectedRoute from "./components/ProtectedRoute";
 import styled from "styled-components";
-
-// Protected Route Component
-function ProtectedRoute({ element, allowedRoles = [] }) {
-  const location = useLocation();
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
-      setLoading(false);
-    });
-
-    return () => unsubscribe();
-  }, []);
-
-  if (loading) return null;
-
-  if (!user) {
-    alert("Log In required!");
-    return <Navigate to="/" state={{ from: location }} replace />;
-  }
-
-  // Check if the route requires specific roles
-  if (allowedRoles.length > 0) {
-    const userRole = user.role || "patient"; // Default to patient if role is not set
-    if (!allowedRoles.includes(userRole)) {
-      alert("You do not have permission to access this page!");
-      return <Navigate to="/" state={{ from: location }} replace />;
-    }
-  }
-
-  return element;
-}
 
 // App initialization component to clear localStorage
 function AppInitializer() {
@@ -73,46 +37,111 @@ export default function App() {
     <Provider store={store}>
       <Router>
         <AppContainer>
-          {/* Add the AppInitializer to clear localStorage on app start */}
           <AppInitializer />
-
           <div className="flex-1 flex flex-col">
             <MainContent>
               <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <Routes>
+                  <Route path="/" element={<Login />} />
+
+                  {/* Patient Routes */}
                   <Route
                     path="/home"
-                    element={<ProtectedRoute element={<Home />} />}
+                    element={
+                      <ProtectedRoute allowedRoles={["patient"]}>
+                        <Home />
+                      </ProtectedRoute>
+                    }
                   />
-                  <Route path="/" element={<Login />} />
                   <Route
                     path="/chat"
-                    element={<ProtectedRoute element={<ChatInterface />} />}
+                    element={
+                      <ProtectedRoute allowedRoles={["patient"]}>
+                        <ChatInterface />
+                      </ProtectedRoute>
+                    }
                   />
                   <Route
                     path="/appointments"
-                    element={<ProtectedRoute element={<Appointments />} />}
+                    element={
+                      <ProtectedRoute allowedRoles={["patient"]}>
+                        <Appointments />
+                      </ProtectedRoute>
+                    }
                   />
                   <Route
                     path="/records"
-                    element={<ProtectedRoute element={<Records />} />}
+                    element={
+                      <ProtectedRoute allowedRoles={["patient"]}>
+                        <Records />
+                      </ProtectedRoute>
+                    }
                   />
                   <Route
                     path="/profile"
-                    element={<ProtectedRoute element={<Profile />} />}
-                  />
-                  <Route
-                    path="/doctor-dashboard"
                     element={
-                      <ProtectedRoute
-                        element={<DoctorDashboard />}
-                        allowedRoles={["doctor"]}
-                      />
+                      <ProtectedRoute allowedRoles={["patient", "doctor"]}>
+                        <Profile />
+                      </ProtectedRoute>
                     }
                   />
                   <Route
                     path="/matrix-chat"
-                    element={<ProtectedRoute element={<Message />} />}
+                    element={
+                      <ProtectedRoute allowedRoles={["patient"]}>
+                        <Message />
+                      </ProtectedRoute>
+                    }
+                  />
+
+                  {/* Doctor Routes */}
+                  <Route
+                    path="/doctor-dashboard"
+                    element={
+                      <ProtectedRoute allowedRoles={["doctor"]}>
+                        <DoctorDashboard />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/doctor/appointments"
+                    element={
+                      <ProtectedRoute allowedRoles={["doctor"]}>
+                        <Appointments />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/doctor/patients"
+                    element={
+                      <ProtectedRoute allowedRoles={["doctor"]}>
+                        <Records />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/doctor/records"
+                    element={
+                      <ProtectedRoute allowedRoles={["doctor"]}>
+                        <Records />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/doctor/chat"
+                    element={
+                      <ProtectedRoute allowedRoles={["doctor"]}>
+                        <ChatInterface />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/message"
+                    element={
+                      <ProtectedRoute allowedRoles={["patient", "doctor"]}>
+                        <Message />
+                      </ProtectedRoute>
+                    }
                   />
                 </Routes>
               </div>
@@ -125,14 +154,12 @@ export default function App() {
 }
 
 const AppContainer = styled.div`
+  min-height: 100vh;
   display: flex;
-  height: 100vh;
-  overflow: hidden;
-  background-color: #f9fafb;
+  flex-direction: column;
 `;
 
 const MainContent = styled.main`
   flex: 1;
-  overflow-y: auto;
-  padding: 20px;
+  padding: 2rem 0;
 `;
