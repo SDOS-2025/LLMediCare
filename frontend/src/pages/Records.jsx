@@ -1,13 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import styled from 'styled-components';
 import { useSelector, useDispatch } from 'react-redux';
-import { fetchPatientRecords } from '../store/slices/userSlice';
+import { fetchPatientRecords, userUploadDocument } from '../store/slices/userSlice';
 import Header from '../components/Header';
 import Sidebar from '../components/Sidebar';
 
 export default function Records() {
   const dispatch = useDispatch();
-  const { records, documents, medications, loading, error } = useSelector((state) => state.records);
+  const patientRecords = useSelector((state) => state.user.patientRecords);
+  const loading = useSelector((state) => state.user.loading);
+  const error = useSelector((state) => state.user.error);
   const user = useSelector((state) => state.user.currentUser);
   
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -19,11 +21,16 @@ export default function Records() {
   const [documentType, setDocumentType] = useState('test_result');
   const [documentDate, setDocumentDate] = useState('');
   const [documentFile, setDocumentFile] = useState(null);
+  const [fileBase64, setFileBase64] = useState('');
+  
+  // Add fileInputRef for handling file uploads
+  const fileInputRef = useRef(null);
 
   // Fetch records when user is available
   useEffect(() => {
     if (user) {
-      dispatch(fetchPatientRecords());
+      console.log(user);
+      dispatch(fetchPatientRecords(user.email));
     }
   }, [dispatch, user]);
 
@@ -31,40 +38,52 @@ export default function Records() {
     setSidebarOpen(!sidebarOpen);
   };
 
-  // Updated: Document upload now makes a POST request to the backend.
+  // Handle file selection
+  const handleFileSelect = () => {
+    if (fileInputRef.current) {
+      fileInputRef.current.click();
+    }
+  };
+
+  // Handle file conversion to Base64
+  const handleFileChange = (event) => {
+    const file = event.target.files[0];
+    if (file) {
+      setDocumentFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const base64String = reader.result.split(",")[1]; // Remove Base64 prefix
+        setFileBase64(base64String);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  // Updated: Document upload now includes file base64 data
   const handleDocumentUpload = async (e) => {
     e.preventDefault();
-    // For demonstration, we simulate a file upload by assigning a dummy URL.
+
+    if(documentTitle === '' || documentDate === '' || documentFile === null) {
+      alert("Please fill in all fields and select a file to upload.");
+      return;
+    }
+
     const newDocument = {
       title: documentTitle,
       type: documentType,
       date: documentDate,
-      file_url: documentFile ? "http://example.com/dummy-file.pdf" : ""
+      file: fileBase64,
     };
 
-    try {
-      const response = await fetch('http://127.0.0.1:8000/api/records/add_document/', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-          // Add auth headers here if required.
-        },
-        body: JSON.stringify(newDocument)
-      });
-      if (!response.ok) {
-        throw new Error('Failed to add document');
-      }
-      await response.json();
-      dispatch(fetchPatientRecords());
-      // Reset document form
-      setDocumentTitle('');
-      setDocumentType('test_result');
-      setDocumentDate('');
-      setDocumentFile(null);
-      setShowUploadForm(false);
-    } catch (error) {
-      alert(error.message);
-    }
+    dispatch(userUploadDocument({documentData: newDocument, patientEmail: user.email}));
+
+    // Reset document form
+    setDocumentTitle('');
+    setDocumentType('test_result');
+    setDocumentDate('');
+    setDocumentFile(null);
+    setFileBase64('');
+    setShowUploadForm(false);
   };
 
   if (loading) {
@@ -87,9 +106,9 @@ export default function Records() {
         <Header toggleSidebar={toggleSidebar} sidebarOpen={sidebarOpen} />
         <Sidebar isOpen={sidebarOpen} setIsOpen={setSidebarOpen} />
         <MainContent sidebarOpen={sidebarOpen}>
-          <ErrorContainer>
-            <ErrorText>{error}</ErrorText>
-          </ErrorContainer>
+        <ErrorContainer>
+          <ErrorText>{error.detail || (typeof error === 'object' ? JSON.stringify(error) : error)}</ErrorText>
+        </ErrorContainer>
         </MainContent>
       </AppContainer>
     );
@@ -157,9 +176,9 @@ export default function Records() {
           <TabContent>
             {activeTab === 'medical' && (
               <TabSection>
-                {records.length > 0 ? (
+                {patientRecords && patientRecords.records && patientRecords.records.length > 0 ? (
                   <RecordList>
-                    {records.map((record) => (
+                    {patientRecords.records.map((record) => (
                       <RecordItem key={record.id}>
                         <div>
                           <p className="font-medium text-gray-900">
@@ -248,14 +267,29 @@ export default function Records() {
                         <label className="block text-sm font-medium text-gray-700 mb-1">
                           File
                         </label>
-                        <input
-                          type="file"
-                          onChange={(e) => setDocumentFile(e.target.files[0])}
-                          className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                          required
-                        />
+                        <div className="flex items-center">
+                          <input
+                            type="file"
+                            ref={fileInputRef}
+                            onChange={handleFileChange}
+                            className="hidden"
+                            required
+                          />
+                          <button
+                            type="button"
+                            onClick={handleFileSelect}
+                            className="px-4 py-2 bg-gray-200 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-300"
+                          >
+                            Select File
+                          </button>
+                          {documentFile && (
+                            <span className="ml-3 text-sm text-gray-500">
+                              {documentFile.name}
+                            </span>
+                          )}
+                        </div>
                       </div>
-                      <div className="flex space-x-4">
+                      <div className="flex space-x-4 mt-6">
                         <Button type="submit">Upload</Button>
                         <Button type="button" variant="outline" onClick={() => setShowUploadForm(false)}>
                           Cancel
@@ -266,9 +300,9 @@ export default function Records() {
                 )}
 
                 {!showUploadForm && (
-                  documents.length > 0 ? (
+                  patientRecords && patientRecords.documents && patientRecords.documents.length > 0 ? (
                     <DocumentList>
-                      {documents.map((document) => (
+                      {patientRecords.documents.map((document) => (
                         <DocumentItem key={document.id}>
                           <div className="flex justify-between items-center">
                             <div>
@@ -282,10 +316,11 @@ export default function Records() {
                               <p className="text-sm text-gray-500">Date: {document.date}</p>
                             </div>
                             <a 
-                              href={document.file_url}
+                              href={`data:application/octet-stream;base64,${document.file}`}
                               className="text-blue-600 hover:text-blue-800"
                               target="_blank"
                               rel="noopener noreferrer"
+                              download={document.title}
                             >
                               View
                             </a>
@@ -308,9 +343,9 @@ export default function Records() {
 
             {activeTab === 'medications' && (
               <TabSection>
-                {medications.length > 0 ? (
+                {patientRecords && patientRecords.medications && patientRecords.medications.length > 0 ? (
                   <MedicationList>
-                    {medications.map((medication) => (
+                    {patientRecords.medications.map((medication) => (
                       <MedicationItem key={medication.id}>
                         <div>
                           <div className="flex justify-between">

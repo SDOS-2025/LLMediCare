@@ -46,22 +46,7 @@ export default function Header({ toggleSidebar, sidebarOpen }) {
         <SearchBar><Search /></SearchBar>
       </LeftSection>
       <RightSection>
-        <NotificationIconContainer 
-          onClick={toggleNotifications}
-          className="notification-icon"
-        >
-          <FaBell size={20} />
-          {notificationCount > 0 && (
-            <NotificationBadge>
-              {notificationCount > 99 ? '99+' : notificationCount}
-            </NotificationBadge>
-          )}
-        </NotificationIconContainer>
-        {showNotifications && (
-          <NotificationsDropdown className="notifications-dropdown">
-            <Notifications inDropdown={true} />
-          </NotificationsDropdown>
-        )}
+      <Notifications inDropdown={true} />
       </RightSection>
     </HeaderContainer>
   );

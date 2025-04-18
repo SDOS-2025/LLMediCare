@@ -1,6 +1,4 @@
-// The React component for Appointments
-
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import axios from "axios";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
@@ -8,16 +6,18 @@ import Header from "../components/Header";
 import Sidebar from "../components/Sidebar";
 import styled from "styled-components";
 import { useSelector } from "react-redux";
-import { FiSearch, FiX, FiPlus, FiPaperclip, FiDownload, FiCheck, FiX as FiXMark } from "react-icons/fi";
+import { FiSearch, FiX, FiPaperclip, FiDownload, FiCheck, FiX as FiXMark } from "react-icons/fi";
+import { createNotification } from "../components/Notifications"; // Import the updated Notifications component
 
 export default function Appointments() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const currentUser = useSelector((state) => state.user.currentUser);
+  const notificationsRef = useRef(null);
   
   // Appointment form state
   const [appointmentDate, setAppointmentDate] = useState(new Date());
-  const [startTime, setStartTime] = useState('09:00');
-  const [endTime, setEndTime] = useState('10:00');
+  const [startTime, setStartTime] = useState('00:00');
+  const [endTime, setEndTime] = useState('00:00');
   const [reason, setReason] = useState('');
   
   // Document upload
@@ -52,16 +52,12 @@ export default function Appointments() {
   const [startDate, setStartDate] = useState(new Date());
   const [endDate, setEndDate] = useState(new Date(new Date().setDate(new Date().getDate() + 7)));
   const [instructions, setInstructions] = useState('');
-  
-  // Notifications
-  const [notifications, setNotifications] = useState([]);
-  const [showNotifications, setShowNotifications] = useState(false);
 
   // Fetch doctors list
   useEffect(() => {
     async function fetchDoctors() {
       try {
-        const response = await axios.get('http://localhost:8000/api/users/doctors/list/');
+        const response = await axios.get('http://localhost:8000/api/user/doctors/list/');
         setDoctors(response.data);
         setFilteredDoctors(response.data);
         if (response.data.length > 0) {
@@ -81,7 +77,7 @@ export default function Appointments() {
 
       try {
         const response = await axios.get(
-          `http://localhost:8000/api/appointments/user/${currentUser.email}/`
+          `http://localhost:8000/api/user/appointments/user/${currentUser.email}/`
         );
         setAppointments(response.data);
       } catch (error) {
@@ -90,27 +86,6 @@ export default function Appointments() {
     }
     fetchAppointments();
   }, [currentUser, message]);
-
-  // Fetch notifications
-  useEffect(() => {
-    async function fetchNotifications() {
-      if (!currentUser) return;
-
-      try {
-        const response = await axios.get(
-          `http://localhost:8000/api/notifications/unread/?user_email=${currentUser.email}`
-        );
-        setNotifications(response.data);
-      } catch (error) {
-        console.error('Error fetching notifications:', error);
-      }
-    }
-    fetchNotifications();
-    
-    // Set up polling for notifications every 60 seconds
-    const interval = setInterval(fetchNotifications, 60000);
-    return () => clearInterval(interval);
-  }, [currentUser]);
 
   useEffect(() => {
     // Filter doctors based on search query
@@ -128,8 +103,16 @@ export default function Appointments() {
     setSidebarOpen(!sidebarOpen);
   };
 
-  const handleFileChange = (e) => {
-    setSelectedFile(e.target.files[0]);
+  const handleFileChange = (event) => {
+    const file = event.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const base64String = reader.result.split(",")[1]; // Remove Base64 prefix
+        setSelectedFile(base64String);
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   const handleFileUpload = async () => {
@@ -143,11 +126,11 @@ export default function Appointments() {
     try {
       if (currentUser.role === 'patient') {
         formData.append('user_email', currentUser.email);
-        await axios.post('http://localhost:8000/api/documents/patient/upload/', formData);
+        await axios.post('http://localhost:8000/api/user/documents/patient/upload/', formData);
       } else {
         formData.append('doctor_email', currentUser.email);
         formData.append('patient_email', currentAppointment?.patient?.email || '');
-        await axios.post('http://localhost:8000/api/documents/doctor/upload/', formData);
+        await axios.post('http://localhost:8000/api/user/documents/doctor/upload/', formData);
       }
       
       setDocuments([...documents, { 
@@ -181,13 +164,24 @@ export default function Appointments() {
     };
     
     try {
-      await axios.post('http://localhost:8000/api/appointments/', payload);
+      await axios.post(`http://localhost:8000/api/user/appointments/?email=${currentUser.email}`, payload);
+      
       setMessage('Appointment request sent successfully.');
+      
+      // Create notification for doctor
+      const selectedDoctorObj = doctors.find(doc => doc.email === selectedDoctor);
+      if (selectedDoctorObj) {
+        await createNotification(
+          selectedDoctor,
+          "New Appointment Request",
+          `${currentUser.name} has requested an appointment on ${appointmentDate.toISOString().split('T')[0]} at ${startTime}.`
+        );
+      }
       
       // Reset form
       setAppointmentDate(new Date());
-      setStartTime('09:00');
-      setEndTime('10:00');
+      setStartTime('00:00');
+      setEndTime('00:00');
       setReason('');
       setDocuments([]);
       
@@ -199,15 +193,26 @@ export default function Appointments() {
 
   const handleAppointmentAction = async (id, action) => {
     try {
-      await axios.patch(`http://localhost:8000/api/appointments/${id}/`, {
+      const appointmentToUpdate = appointments.find(app => app.id === id);
+      
+      await axios.patch(`http://localhost:8000/api/user/appointments/${id}/`, {
         status: action
       });
       
       setMessage(`Appointment ${action === 'accepted' ? 'approved' : 'refused'} successfully.`);
       
+      // Create notification for patient
+      if (appointmentToUpdate && appointmentToUpdate.patient) {
+        await createNotification(
+          appointmentToUpdate.patient.email,
+          `Appointment ${action === 'accepted' ? 'Approved' : 'Declined'}`,
+          `Your appointment on ${appointmentToUpdate.appointment_date} at ${appointmentToUpdate.start_time} has been ${action === 'accepted' ? 'approved' : 'declined'} by Dr. ${currentUser.name}.`
+        );
+      }
+      
       // Refresh appointments
       const response = await axios.get(
-        `http://localhost:8000/api/appointments/user/${currentUser.email}/`
+        `http://localhost:8000/api/user/appointments/user/${currentUser.email}/`
       );
       setAppointments(response.data);
       
@@ -242,8 +247,16 @@ export default function Appointments() {
     };
     
     try {
-      await axios.post(`http://localhost:8000/api/appointments/${currentAppointment.id}/add_medical_record/`, payload);
+      await axios.post(`http://localhost:8000/api/user/appointments/${currentAppointment.id}/add_medical_record/`, payload);
       setMessage('Medical record added successfully.');
+      
+      // Create notification for patient
+      await createNotification(
+        currentAppointment.patient.email,
+        "New Medical Record Added",
+        `Dr. ${currentUser.name} has added a new medical record to your profile.`
+      );
+      
       setShowMedicalRecordModal(false);
       
       // Reset form
@@ -274,8 +287,16 @@ export default function Appointments() {
     };
     
     try {
-      await axios.post(`http://localhost:8000/api/appointments/${currentAppointment.id}/add_medication/`, payload);
+      await axios.post(`http://localhost:8000/api/user/appointments/${currentAppointment.id}/add_medication/`, payload);
       setMessage('Medication added successfully.');
+      
+      // Create notification for patient
+      await createNotification(
+        currentAppointment.patient.email,
+        "New Medication Prescribed",
+        `Dr. ${currentUser.name} has prescribed ${medicationName} (${dosage}) to be taken ${frequency}.`
+      );
+      
       setShowMedicationModal(false);
       
       // Reset form
@@ -289,33 +310,6 @@ export default function Appointments() {
     } catch (error) {
       console.error('Error adding medication:', error);
       setMessage('Error adding medication.');
-    }
-  };
-
-  const markNotificationAsRead = async (id) => {
-    try {
-      await axios.patch(`http://localhost:8000/api/notifications/${id}/mark-read/`);
-      
-      // Update notifications list
-      const response = await axios.get(
-        `http://localhost:8000/api/notifications/unread/?user_email=${currentUser.email}`
-      );
-      setNotifications(response.data);
-      
-    } catch (error) {
-      console.error('Error marking notification as read:', error);
-    }
-  };
-
-  const markAllNotificationsAsRead = async () => {
-    try {
-      await axios.patch(
-        `http://localhost:8000/api/notifications/mark-all-read/?user_email=${currentUser.email}`
-      );
-      setNotifications([]);
-      
-    } catch (error) {
-      console.error('Error marking all notifications as read:', error);
     }
   };
 
@@ -339,50 +333,6 @@ export default function Appointments() {
                 : "Book a consultation with your preferred doctor."}
             </PageSubtitle>
           </HeaderSection>
-
-          {/* Notifications bell */}
-          <NotificationContainer>
-            <NotificationBell onClick={() => setShowNotifications(!showNotifications)}>
-              🔔
-              {notifications.length > 0 && (
-                <NotificationBadge>{notifications.length}</NotificationBadge>
-              )}
-            </NotificationBell>
-            
-            {showNotifications && (
-              <NotificationDropdown>
-                <NotificationHeader>
-                  <h3>Notifications</h3>
-                  {notifications.length > 0 && (
-                    <MarkAllReadButton onClick={markAllNotificationsAsRead}>
-                      Mark all as read
-                    </MarkAllReadButton>
-                  )}
-                </NotificationHeader>
-                
-                {notifications.length > 0 ? (
-                  <NotificationList>
-                    {notifications.map(notification => (
-                      <NotificationItem key={notification.id}>
-                        <NotificationContent>
-                          <NotificationTitle>{notification.title}</NotificationTitle>
-                          <NotificationMessage>{notification.message}</NotificationMessage>
-                          <NotificationTime>
-                            {new Date(notification.created_at).toLocaleString()}
-                          </NotificationTime>
-                        </NotificationContent>
-                        <MarkReadButton onClick={() => markNotificationAsRead(notification.id)}>
-                          <FiCheck />
-                        </MarkReadButton>
-                      </NotificationItem>
-                    ))}
-                  </NotificationList>
-                ) : (
-                  <NoNotifications>No new notifications</NoNotifications>
-                )}
-              </NotificationDropdown>
-            )}
-          </NotificationContainer>
 
           <CardContainer>
             {/* Patient view - Schedule appointment */}
@@ -465,7 +415,7 @@ export default function Appointments() {
                 <FormGroup>
                   <Label>Upload Documents (Optional):</Label>
                   <FileUploadContainer>
-                    <FileInput
+                  <FileInput
                       type="file"
                       id="document"
                       onChange={handleFileChange}
@@ -844,6 +794,8 @@ const AppContainer = styled.div`
 
 const MainContent = styled.main`
   flex: 1;
+  wdith: 100%;
+  hieght: 100vh;
   padding: 1.5rem;
   margin-top: 4rem;
   position: relative;

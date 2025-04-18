@@ -6,7 +6,6 @@ from .models import User, Session, MedicalRecord, Document, Medication, Appointm
 from .serializers import UserSerializer, SessionSerializer, MedicalRecordSerializer, DocumentSerializer, MedicationSerializer, NotificationSerializer, AppointmentSerializer
 from django.utils import timezone
 from datetime import timedelta
-from backend.user_session import models
 
 
 class UserViewSet(viewsets.ModelViewSet):
@@ -273,7 +272,7 @@ def add_medical_record(request):
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['POST'])
-def add_document(request):
+def add_document(request, user_email):
     """
     API endpoint to add a new document.
     Expects a JSON payload with the following fields:
@@ -282,9 +281,18 @@ def add_document(request):
       - date: date in YYYY-MM-DD format
       - file_url: URL of the uploaded document file
     """
-    serializer = DocumentSerializer(data=request.data)
+    
+    user = get_object_or_404(User, email=user_email)
+    
+    # Create document associated with the user
+    data = request.data.copy()
+    data['user'] = user.id
+
+    print(data)
+    
+    serializer = DocumentSerializer(data=data)
     if serializer.is_valid():
-        serializer.save()  # Optionally, you can associate the document with a user here
+        serializer.save()
         return Response(serializer.data, status=status.HTTP_201_CREATED)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -525,6 +533,8 @@ def patient_upload_document(request):
     # Create document associated with the user
     data = request.data.copy()
     data['user'] = user.id
+
+    print(data)
     
     serializer = DocumentSerializer(data=data)
     if serializer.is_valid():
@@ -571,6 +581,69 @@ class NotificationViewSet(viewsets.ModelViewSet):
             except User.DoesNotExist:
                 return Notification.objects.none()
         return Notification.objects.none()
+    
+    @action(detail=False, methods=['post'])
+    def create_notification(self, request):
+        # print("Request: ", request.data)
+        user_email = request.data.get('user_email')
+        # print(user_email)
+        title = request.data.get('title')
+        # print(title)  
+        message = request.data.get('message')
+        # print(message)
+        notification_type = request.data.get('type', 'reminder')  # Default to reminder if not specified
+        # print(notification_type)
+        
+        # Optional related model references
+        appointment_id = request.data.get('appointment_id')
+        medical_record_id = request.data.get('medical_record_id')
+        medication_id = request.data.get('medication_id')
+        
+        if not all([user_email, title, message]):
+            return Response(
+                {"error": "user_email, title and message are required"}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            user = User.objects.get(email=user_email)
+            
+            notification_data = {
+                'user': user,
+                'title': title,
+                'message': message,
+                'type': notification_type,
+                'read': False
+            }
+
+            print(notification_data)
+            
+            # Add related objects if IDs are provided
+            if appointment_id:
+                try:
+                    notification_data['appointment'] = Appointment.objects.get(id=appointment_id)
+                except Appointment.DoesNotExist:
+                    pass
+                    
+            if medical_record_id:
+                try:
+                    notification_data['medical_record'] = MedicalRecord.objects.get(id=medical_record_id)
+                except MedicalRecord.DoesNotExist:
+                    pass
+                    
+            if medication_id:
+                try:
+                    notification_data['medication'] = Medication.objects.get(id=medication_id)
+                except Medication.DoesNotExist:
+                    pass
+            
+            notification = Notification.objects.create(**notification_data)
+            serializer = self.get_serializer(notification)
+            
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+    
+        except User.DoesNotExist:
+            return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
     
     @action(detail=False, methods=['get'])
     def unread(self, request):

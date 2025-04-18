@@ -115,6 +115,21 @@ export const doctorUploadDocument = createAsyncThunk(
   }
 );
 
+export const userUploadDocument = createAsyncThunk(
+  'user/userUploadDocument',
+  async ({ documentData, patientEmail }, { dispatch, rejectWithValue }) => {
+    try {
+      const response = await axios.post(
+        `${API_BASE}/records/add_document/${patientEmail}/`,
+        documentData
+      );
+      dispatch(fetchPatientRecords(patientEmail)); // Fetch updated records after upload
+    } catch (error) {
+      return rejectWithValue(error.response?.data || "Error uploading document");
+    }
+  }
+);
+
 // NEW: Async thunk to get a patient's medical records, documents, and medications
 export const fetchPatientRecords = createAsyncThunk(
   'user/fetchPatientRecords',

@@ -64,7 +64,7 @@ class Document(models.Model):
     title = models.CharField(max_length=255)
     type = models.CharField(max_length=50)
     date = models.DateField()
-    file_url = models.URLField()
+    file = models.TextField()
 
     def __str__(self):
         return self.title
