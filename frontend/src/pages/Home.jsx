@@ -1,11 +1,35 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import styled from 'styled-components';
+import { useSelector } from 'react-redux';
 import Header from '../components/Header';
 import Sidebar from '../components/Sidebar';
 
+const UserRoleDisplay = styled.div`
+  position: fixed;
+  top: 64px;
+  right: 20px;
+  background-color: #2563eb;
+  color: white;
+  padding: 8px 16px;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 500;
+  z-index: 1000;
+`;
+
 export default function Home () {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const currentUser = useSelector((state) => state.user.currentUser);
+
+  useEffect(() => {
+    console.log('Current User:', currentUser);
+    if (currentUser) {
+      console.log('User Role:', currentUser.role);
+    } else {
+      console.log('No current user found');
+    }
+  }, [currentUser]);
 
   const toggleSidebar = () => {
     setSidebarOpen(!sidebarOpen);
@@ -14,6 +38,11 @@ export default function Home () {
   return (
     <AppContainer>
       <Header toggleSidebar={toggleSidebar} sidebarOpen={sidebarOpen} />
+      {currentUser && (
+        <UserRoleDisplay>
+          {currentUser.role === 'doctor' ? 'Doctor' : 'Patient'}
+        </UserRoleDisplay>
+      )}
       <Sidebar isOpen={sidebarOpen} setIsOpen={setSidebarOpen} />
       
       <MainContent>

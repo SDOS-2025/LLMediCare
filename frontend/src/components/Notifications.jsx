@@ -50,11 +50,21 @@ export default function Notifications({inDropdown}) {
 
   const markAllNotificationsAsRead = async () => {
     try {
-      await axios.patch(
-        `http://localhost:8000/api/user/notifications/mark-all-read/?user_email=${currentUser.email}`
+      const response = await axios.patch(
+        `http://localhost:8000/api/notifications/mark-all-read/`,
+        null,
+        {
+          params: {
+            user_email: currentUser.email
+          },
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        }
       );
-      setNotifications([]);
-      
+      if (response.data) {
+        setNotifications([]);
+      }
     } catch (error) {
       console.error('Error marking all notifications as read:', error);
     }
@@ -187,26 +197,18 @@ export default function Notifications({inDropdown}) {
 }
 
 // Create notification function - can be exported and used in other components
-export const createNotification = async (userEmail, title, message) => {
+export const createNotification = async (recipientEmail, title, message) => {
   try {
-    const data = {
-      user_email: userEmail,
+    const response = await axios.post('http://localhost:8000/api/user/notifications/', {
+      user_email: recipientEmail,
       title: title,
-      message: message
-    };
-    console.log(data);
-    await axios.post('http://localhost:8000/api/user/notifications/', 
-      data, 
-      {
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      }
-    );    
-    return true;
+      message: message,
+      type: 'appointment'
+    });
+    return response.data;
   } catch (error) {
     console.error('Error creating notification:', error);
-    return false;
+    throw error;
   }
 };
 

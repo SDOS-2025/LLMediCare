@@ -7,12 +7,12 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
 
   if (!currentUser) {
     // Not logged in, redirect to login page
-    return <Navigate to="/login" replace />;
+    return <Navigate to="/" replace />;
   }
 
   if (allowedRoles && !allowedRoles.includes(currentUser.role)) {
     // User's role is not authorized, redirect to home page
-    return <Navigate to="/" replace />;
+    return <Navigate to="/home" replace />;
   }
 
   // Authorized, render children

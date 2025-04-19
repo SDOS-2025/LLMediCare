@@ -4,10 +4,11 @@ import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import Header from "../components/Header";
 import Sidebar from "../components/Sidebar";
+import Notifications from "../components/Notifications";
 import styled from "styled-components";
 import { useSelector } from "react-redux";
 import { FiSearch, FiX, FiPaperclip, FiDownload, FiCheck, FiX as FiXMark } from "react-icons/fi";
-import { createNotification } from "../components/Notifications"; // Import the updated Notifications component
+import { createNotification } from "../components/Notifications";
 
 export default function Appointments() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -33,6 +34,9 @@ export default function Appointments() {
   // Appointments list
   const [appointments, setAppointments] = useState([]);
   const [message, setMessage] = useState('');
+  
+  // Notifications state
+  const [notifications, setNotifications] = useState([]);
   
   // Modals
   const [showMedicalRecordModal, setShowMedicalRecordModal] = useState(false);
@@ -77,7 +81,7 @@ export default function Appointments() {
 
       try {
         const response = await axios.get(
-          `http://localhost:8000/api/user/appointments/user/${currentUser.email}/`
+          `http://localhost:8000/api/user/appointments/?email=${currentUser.email}`
         );
         setAppointments(response.data);
       } catch (error) {
@@ -86,6 +90,23 @@ export default function Appointments() {
     }
     fetchAppointments();
   }, [currentUser, message]);
+
+  // Fetch notifications
+  useEffect(() => {
+    async function fetchNotifications() {
+      if (!currentUser) return;
+
+      try {
+        const response = await axios.get(
+          `http://localhost:8000/api/notifications/?user_email=${currentUser.email}`
+        );
+        setNotifications(response.data);
+      } catch (error) {
+        console.error('Error fetching notifications:', error);
+      }
+    }
+    fetchNotifications();
+  }, [currentUser]);
 
   useEffect(() => {
     // Filter doctors based on search query
@@ -154,8 +175,15 @@ export default function Appointments() {
       return;
     }
     
+    // Find the selected doctor's details
+    const selectedDoctorObj = doctors.find(doc => doc.email === selectedDoctor);
+    if (!selectedDoctorObj) {
+      setMessage('Selected doctor not found.');
+      return;
+    }
+    
     const payload = {
-      doctor_email: selectedDoctor,
+      doctor_email: selectedDoctor,  // This is the correct field name expected by the backend
       appointment_date: appointmentDate.toISOString().split('T')[0],
       start_time: startTime,
       end_time: endTime,
@@ -163,19 +191,38 @@ export default function Appointments() {
       status: 'pending'
     };
     
+    // Debug logging
+    console.log('Creating appointment with payload:', payload);
+    console.log('Selected doctor object:', selectedDoctorObj);
+    console.log('Current user email:', currentUser.email);
+    
     try {
-      await axios.post(`http://localhost:8000/api/user/appointments/?email=${currentUser.email}`, payload);
+      // First create the appointment
+      const response = await axios.post(
+        `http://localhost:8000/api/user/appointments/?email=${currentUser.email}`,
+        payload
+      );
+      
+      // Detailed logging of the created appointment
+      console.log('Appointment created successfully. Response data:', {
+        appointment: response.data,
+        doctor_email: response.data.doctor?.email,
+        patient_email: response.data.patient?.email,
+        current_user_email: currentUser.email
+      });
       
       setMessage('Appointment request sent successfully.');
       
-      // Create notification for doctor
-      const selectedDoctorObj = doctors.find(doc => doc.email === selectedDoctor);
-      if (selectedDoctorObj) {
+      // Then create notification for doctor
+      try {
         await createNotification(
           selectedDoctor,
           "New Appointment Request",
           `${currentUser.name} has requested an appointment on ${appointmentDate.toISOString().split('T')[0]} at ${startTime}.`
         );
+      } catch (notificationError) {
+        console.error('Error creating notification:', notificationError);
+        // Don't fail the appointment creation if notification fails
       }
       
       // Reset form
@@ -185,40 +232,60 @@ export default function Appointments() {
       setReason('');
       setDocuments([]);
       
+      // Refresh appointments list
+      const appointmentsResponse = await axios.get(
+        `http://localhost:8000/api/user/appointments/?email=${currentUser.email}`
+      );
+      setAppointments(appointmentsResponse.data);
+      
     } catch (error) {
       console.error('Error submitting appointment request:', error);
+      console.error('Error response data:', error.response?.data);
       setMessage('Error submitting appointment request: ' + JSON.stringify(error.response?.data));
     }
   };
 
-  const handleAppointmentAction = async (id, action) => {
+  const handleAppointmentAction = async (appointmentId, action) => {
     try {
-      const appointmentToUpdate = appointments.find(app => app.id === id);
-      
-      await axios.patch(`http://localhost:8000/api/user/appointments/${id}/`, {
-        status: action
-      });
-      
-      setMessage(`Appointment ${action === 'accepted' ? 'approved' : 'refused'} successfully.`);
-      
-      // Create notification for patient
-      if (appointmentToUpdate && appointmentToUpdate.patient) {
-        await createNotification(
-          appointmentToUpdate.patient.email,
-          `Appointment ${action === 'accepted' ? 'Approved' : 'Declined'}`,
-          `Your appointment on ${appointmentToUpdate.appointment_date} at ${appointmentToUpdate.start_time} has been ${action === 'accepted' ? 'approved' : 'declined'} by Dr. ${currentUser.name}.`
-        );
+      const appointment = appointments.find(a => a.id === appointmentId);
+      if (!appointment) {
+        setMessage('Appointment not found.');
+        return;
       }
+
+      // Debug logging
+      console.log('Current user:', currentUser);
+      console.log('Appointment doctor:', appointment.doctor);
       
-      // Refresh appointments
-      const response = await axios.get(
-        `http://localhost:8000/api/user/appointments/user/${currentUser.email}/`
+      // Check if the current user is authorized to perform this action
+      if (currentUser.role === 'doctor' && appointment.doctor?.email !== currentUser.email) {
+        setMessage('You are not authorized to manage this appointment.');
+        return;
+      }
+
+      const response = await axios.patch(
+        `http://localhost:8000/api/user/appointments/${appointmentId}/?email=${currentUser.email}`,
+        { status: action }
       );
-      setAppointments(response.data);
-      
+
+      if (response.data) {
+        // Update the appointments list
+        const updatedAppointments = appointments.map(a => 
+          a.id === appointmentId ? response.data : a
+        );
+        setAppointments(updatedAppointments);
+        setMessage(`Appointment ${action} successfully.`);
+
+        // Create notification for the other party
+        if (action === 'accepted' || action === 'refused') {
+          const notificationTitle = `Appointment ${action}`;
+          const notificationMessage = `Your appointment request has been ${action} by Dr. ${currentUser.name}.`;
+          await createNotification(appointment.patient?.email, notificationTitle, notificationMessage);
+        }
+      }
     } catch (error) {
-      console.error(`Error ${action} appointment:`, error);
-      setMessage(`Error ${action} appointment.`);
+      console.error('Error handling appointment action:', error);
+      setMessage('Error handling appointment action: ' + (error.response?.data?.error || error.message));
     }
   };
 
@@ -324,7 +391,7 @@ export default function Appointments() {
           <HeaderSection>
             <PageTitle>
               {currentUser && currentUser.role === "doctor"
-                ? "Patient Appointments"
+                ? "Patient Appointments11"
                 : "Schedule an Appointment"}
             </PageTitle>
             <PageSubtitle>

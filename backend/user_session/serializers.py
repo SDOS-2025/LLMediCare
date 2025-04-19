@@ -28,6 +28,8 @@ class MedicationSerializer(serializers.ModelSerializer):
 
 class AppointmentSerializer(serializers.ModelSerializer):
     doctor_email = serializers.CharField(write_only=True)
+    doctor = serializers.SerializerMethodField()
+    patient = serializers.SerializerMethodField()
 
     class Meta:
         model = Appointment
@@ -36,6 +38,24 @@ class AppointmentSerializer(serializers.ModelSerializer):
             'doctor': {'read_only': True},
             'patient': {'read_only': True},  # So the patient field is set from the view.
         }
+
+    def get_doctor(self, obj):
+        if obj.doctor:
+            return {
+                'id': obj.doctor.id,
+                'name': obj.doctor.name,
+                'email': obj.doctor.email
+            }
+        return None
+
+    def get_patient(self, obj):
+        if obj.patient:
+            return {
+                'id': obj.patient.id,
+                'name': obj.patient.name,
+                'email': obj.patient.email
+            }
+        return None
 
     def create(self, validated_data):
         doctor_email = validated_data.pop('doctor_email')

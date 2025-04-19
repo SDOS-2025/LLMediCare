@@ -44,11 +44,11 @@ export default function App() {
                 <Routes>
                   <Route path="/" element={<Login />} />
 
-                  {/* Patient Routes */}
+                  {/* Shared Routes for both Doctors and Patients */}
                   <Route
                     path="/home"
                     element={
-                      <ProtectedRoute allowedRoles={["patient"]}>
+                      <ProtectedRoute allowedRoles={["patient", "doctor"]}>
                         <Home />
                       </ProtectedRoute>
                     }
@@ -56,7 +56,7 @@ export default function App() {
                   <Route
                     path="/chat"
                     element={
-                      <ProtectedRoute allowedRoles={["patient"]}>
+                      <ProtectedRoute allowedRoles={["patient", "doctor"]}>
                         <ChatInterface />
                       </ProtectedRoute>
                     }
@@ -64,7 +64,7 @@ export default function App() {
                   <Route
                     path="/appointments"
                     element={
-                      <ProtectedRoute allowedRoles={["patient"]}>
+                      <ProtectedRoute allowedRoles={["patient", "doctor"]}>
                         <Appointments />
                       </ProtectedRoute>
                     }
@@ -72,7 +72,7 @@ export default function App() {
                   <Route
                     path="/records"
                     element={
-                      <ProtectedRoute allowedRoles={["patient"]}>
+                      <ProtectedRoute allowedRoles={["patient", "doctor"]}>
                         <Records />
                       </ProtectedRoute>
                     }
@@ -86,9 +86,9 @@ export default function App() {
                     }
                   />
                   <Route
-                    path="/matrix-chat"
+                    path="/message"
                     element={
-                      <ProtectedRoute allowedRoles={["patient"]}>
+                      <ProtectedRoute allowedRoles={["patient", "doctor"]}>
                         <Message />
                       </ProtectedRoute>
                     }
@@ -132,14 +132,6 @@ export default function App() {
                     element={
                       <ProtectedRoute allowedRoles={["doctor"]}>
                         <ChatInterface />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/message"
-                    element={
-                      <ProtectedRoute allowedRoles={["patient", "doctor"]}>
-                        <Message />
                       </ProtectedRoute>
                     }
                   />
