@@ -16,7 +16,7 @@ class User(models.Model):
     # You might want to remove or repurpose this field if you're using relational models for records.
     medical_records = models.JSONField(default=list, null=True, blank=True)
     profile_pic = models.TextField(null=True, blank=True)
-
+    verified = models.BooleanField(default=False)
     def __str__(self):
         return self.name
 

@@ -24,6 +24,7 @@ INSTALLED_APPS = [
     'corsheaders',
     'user_session',
     'ai_agent',
+    'django_extensions',  # For using Django extensions like shell_plus
 ]
 
 MIDDLEWARE = [

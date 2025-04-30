@@ -91,23 +91,6 @@ export default function Appointments() {
     fetchAppointments();
   }, [currentUser, message]);
 
-  // Fetch notifications
-  useEffect(() => {
-    async function fetchNotifications() {
-      if (!currentUser) return;
-
-      try {
-        const response = await axios.get(
-          `http://localhost:8000/api/notifications/?user_email=${currentUser.email}`
-        );
-        setNotifications(response.data);
-      } catch (error) {
-        console.error('Error fetching notifications:', error);
-      }
-    }
-    fetchNotifications();
-  }, [currentUser]);
-
   useEffect(() => {
     // Filter doctors based on search query
     if (searchQuery) {
@@ -314,7 +297,7 @@ export default function Appointments() {
     };
     
     try {
-      await axios.post(`http://localhost:8000/api/user/appointments/${currentAppointment.id}/add_medical_record/`, payload);
+      await axios.post(`http://localhost:8000/api/user/appointments/${currentAppointment.id}/add_medical_record/?email=${currentUser.email}`, payload);
       setMessage('Medical record added successfully.');
       
       // Create notification for patient
@@ -354,7 +337,7 @@ export default function Appointments() {
     };
     
     try {
-      await axios.post(`http://localhost:8000/api/user/appointments/${currentAppointment.id}/add_medication/`, payload);
+      await axios.post(`http://localhost:8000/api/user/appointments/${currentAppointment.id}/add_medication/?email=${currentUser.email}`, payload);
       setMessage('Medication added successfully.');
       
       // Create notification for patient
@@ -391,7 +374,7 @@ export default function Appointments() {
           <HeaderSection>
             <PageTitle>
               {currentUser && currentUser.role === "doctor"
-                ? "Patient Appointments11"
+                ? "Patient Appointments"
                 : "Schedule an Appointment"}
             </PageTitle>
             <PageSubtitle>

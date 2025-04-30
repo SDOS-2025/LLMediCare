@@ -33,32 +33,14 @@ export default function Notifications({inDropdown}) {
     return () => clearInterval(interval);
   }, [currentUser]);
 
-  const markNotificationAsRead = async (id) => {
-    try {
-      await axios.patch(`http://localhost:8000/api/user/notifications/${id}/mark-read/`);
-      
-      // Update notifications list
-      const response = await axios.get(
-        `http://localhost:8000/api/user/notifications/unread/?user_email=${currentUser.email}`
-      );
-      setNotifications(response.data);
-      
-    } catch (error) {
-      console.error('Error marking notification as read:', error);
-    }
-  };
-
   const markAllNotificationsAsRead = async () => {
     try {
       const response = await axios.patch(
-        `http://localhost:8000/api/notifications/mark-all-read/`,
+        `http://localhost:8000/api/user/notifications/mark_all_read/`,
         null,
         {
           params: {
             user_email: currentUser.email
-          },
-          headers: {
-            'Content-Type': 'application/json'
           }
         }
       );
@@ -103,9 +85,6 @@ export default function Notifications({inDropdown}) {
                         {new Date(notification.created_at).toLocaleString()}
                       </NotificationTime>
                     </NotificationContent>
-                    <MarkReadButton onClick={() => markNotificationAsRead(notification.id)}>
-                      <FiCheck />
-                    </MarkReadButton>
                   </NotificationItem>
                 ))}
               </NotificationList>
@@ -140,9 +119,6 @@ export default function Notifications({inDropdown}) {
                             {new Date(notification.created_at).toLocaleString()}
                           </NotificationTime>
                         </NotificationContent>
-                        <MarkReadButton onClick={() => markNotificationAsRead(notification.id)}>
-                          <FiCheck />
-                        </MarkReadButton>
                       </NotificationItem>
                     ))}
                   </NotificationListFullView>
@@ -182,9 +158,6 @@ export default function Notifications({inDropdown}) {
                     {new Date(notification.created_at).toLocaleString()}
                   </NotificationTime>
                 </NotificationContent>
-                <MarkReadButton onClick={() => markNotificationAsRead(notification.id)}>
-                  <FiCheck />
-                </MarkReadButton>
               </NotificationItem>
             ))}
           </NotificationList>

@@ -38,11 +38,6 @@ export default function Home () {
   return (
     <AppContainer>
       <Header toggleSidebar={toggleSidebar} sidebarOpen={sidebarOpen} />
-      {currentUser && (
-        <UserRoleDisplay>
-          {currentUser.role === 'doctor' ? 'Doctor' : 'Patient'}
-        </UserRoleDisplay>
-      )}
       <Sidebar isOpen={sidebarOpen} setIsOpen={setSidebarOpen} />
       
       <MainContent>

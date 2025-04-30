@@ -41,11 +41,7 @@ export default function Login() {
 
       setMessage(`Welcome!`);
       // Redirect based on role
-      if (role === "doctor") {
-        navigate("/doctor-dashboard");
-      } else {
-        navigate("/home");
-      }
+      navigate("/home");
     } catch (error) {
       setMessage(`Error: ${error.message}`);
     }

@@ -51,23 +51,23 @@ export default function Sidebar({ isOpen, setIsOpen }) {
               <NavText isOpen={isOpen}>Home</NavText>
             </StyledNavLink>
           </NavItem>
-          <NavItem>
+          {(curUser.role === "patient" || (curUser.role === "doctor" && !curUser.approved)) && <NavItem>
             <StyledNavLink to="/chat">
               <NavIcon xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
               </NavIcon>
               <NavText isOpen={isOpen}>AI Chat</NavText>
             </StyledNavLink>
-          </NavItem>
-          <NavItem>
-            <StyledNavLink to="/matrix-chat">
+          </NavItem>}
+          {(curUser.role === "patient" || (curUser.role === "doctor" && !curUser.approved)) && <NavItem>
+            <StyledNavLink to="/message">
               <NavIcon xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path>
               </NavIcon>
               <NavText isOpen={isOpen}>Community Chat</NavText>
             </StyledNavLink>
-          </NavItem>
-          <NavItem>
+          </NavItem>}
+          {(curUser.role === "patient" || (curUser.role === "doctor" && !curUser.approved)) && <NavItem>
             <StyledNavLink to="/appointments">
               <NavIcon xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
@@ -77,8 +77,8 @@ export default function Sidebar({ isOpen, setIsOpen }) {
               </NavIcon>
               <NavText isOpen={isOpen}>Appointments</NavText>
             </StyledNavLink>
-          </NavItem>
-          <NavItem>
+          </NavItem>}
+          {curUser.role !== "doctor" && <NavItem>
             <StyledNavLink to="/records">
               <NavIcon xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
@@ -89,7 +89,7 @@ export default function Sidebar({ isOpen, setIsOpen }) {
               </NavIcon>
               <NavText isOpen={isOpen}>Medical Records</NavText>
             </StyledNavLink>
-          </NavItem>
+          </NavItem>}
         </NavGroup>
       </NavigationContainer>
 
