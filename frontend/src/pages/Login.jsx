@@ -8,15 +8,19 @@ import {
 import { useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { createUser, fetchUserDetails } from "../store/slices/userSlice";
+// import ReCAPTCHA from "react-google-recaptcha";
+// import { RECAPTCHA_SITE_KEY } from "../utils/captcha-config"; // Import the site key
 
 export default function Login() {
   const [activeTab, setActiveTab] = useState("login");
   const [message, setMessage] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [passwordStrength, setPasswordStrength] = useState("");
   const [name, setName] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [role, setRole] = useState("patient"); // Default role
+  const [role, setRole] = useState("patient");
+
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const currentUser = useSelector((state) => state.user.currentUser);
@@ -25,22 +29,44 @@ export default function Login() {
     window.scrollTo(0, 0);
   }, []);
 
+  const isStrongPassword = (pwd) => {
+    const minLength = 8;
+    const hasUpper = /[A-Z]/.test(pwd);
+    const hasLower = /[a-z]/.test(pwd);
+    const hasDigit = /\d/.test(pwd);
+    const hasSpecial = /[!@#$%^&*(),.?":{}|<>]/.test(pwd);
+    return pwd.length >= minLength && hasUpper && hasLower && hasDigit && hasSpecial;
+  };
+
+  const evaluatePasswordStrength = (pwd) => {
+    if (pwd.length < 8) return "Too short";
+    let strength = 0;
+    if (/[A-Z]/.test(pwd)) strength++;
+    if (/[a-z]/.test(pwd)) strength++;
+    if (/\d/.test(pwd)) strength++;
+    if (/[!@#$%^&*]/.test(pwd)) strength++;
+    if (strength < 3) return "Weak";
+    if (strength === 3) return "Moderate";
+    return "Strong";
+  };
+
   const handleLoginSubmit = async (e) => {
     e.preventDefault();
+    // if (!captchaVerified) {
+    //   setMessage("Please complete the CAPTCHA.");
+    //   return;
+    // }
+
     try {
       await signInWithEmailAndPassword(auth, email, password);
       const userData = await dispatch(fetchUserDetails(email)).unwrap();
 
-      // Check if the user's role matches the selected role
       if (userData.role !== role) {
-        setMessage(
-          `Error: You are registered as a ${userData.role}, not a ${role}`
-        );
+        setMessage(`Error: You are registered as a ${userData.role}, not a ${role}`);
         return;
       }
 
-      setMessage(`Welcome!`);
-      // Redirect based on role
+      setMessage("Welcome!");
       navigate("/home");
     } catch (error) {
       setMessage(`Error: ${error.message}`);
@@ -49,21 +75,27 @@ export default function Login() {
 
   const handleSignupSubmit = async (e) => {
     e.preventDefault();
+
+    // if (!captchaVerified) {
+    //   setMessage("Please complete the CAPTCHA.");
+    //   return;
+    // }
+
     if (password !== confirmPassword) {
       setMessage("Passwords do not match!");
       return;
     }
 
+    if (!isStrongPassword(password)) {
+      setMessage("Password is not strong enough.");
+      return;
+    }
+
     try {
-      const userCredential = await createUserWithEmailAndPassword(
-        auth,
-        email,
-        password
-      );
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const userData = { name, email, role };
       await dispatch(createUser(userData)).unwrap();
-
-      setMessage("Registration successful! Go to the Login tab to login.");
+      setMessage("Registration successful! Go to Login tab to login.");
       setActiveTab("login");
     } catch (error) {
       setMessage(`Error: ${error.message}`);
@@ -94,13 +126,13 @@ export default function Login() {
             Sign Up
           </button>
         </div>
+
         {message && (
-          <MessageBox
-            className={message.includes("Error") ? "error" : "success"}
-          >
+          <MessageBox className={message.includes("Error") ? "error" : "success"}>
             {message}
           </MessageBox>
         )}
+
         {activeTab === "login" && (
           <form className="form" onSubmit={handleLoginSubmit}>
             <RoleSelector>
@@ -119,6 +151,7 @@ export default function Login() {
                 Doctor
               </RoleOption>
             </RoleSelector>
+
             <InputField
               type="email"
               placeholder="Email"
@@ -133,9 +166,11 @@ export default function Login() {
               onChange={(e) => setPassword(e.target.value)}
               required
             />
+            {/* <ReCAPTCHA sitekey={RECAPTCHA_SITE_KEY} onChange={() => setCaptchaVerified(true)} /> */}
             <SubmitButton type="submit">Login</SubmitButton>
           </form>
         )}
+
         {activeTab === "signup" && (
           <form className="form" onSubmit={handleSignupSubmit}>
             <RoleSelector>
@@ -154,6 +189,7 @@ export default function Login() {
                 Doctor
               </RoleOption>
             </RoleSelector>
+
             <InputField
               type="text"
               placeholder="Full Name"
@@ -172,9 +208,18 @@ export default function Login() {
               type="password"
               placeholder="Password"
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={(e) => {
+                const val = e.target.value;
+                setPassword(val);
+                setPasswordStrength(evaluatePasswordStrength(val));
+              }}
               required
             />
+            {password && (
+              <PasswordStrength style={{ color: passwordStrength === "Strong" ? "green" : passwordStrength === "Moderate" ? "orange" : "red" }}>
+                Strength: {passwordStrength}
+              </PasswordStrength>
+            )}
             <InputField
               type="password"
               placeholder="Confirm Password"
@@ -182,6 +227,7 @@ export default function Login() {
               onChange={(e) => setConfirmPassword(e.target.value)}
               required
             />
+            {/* <ReCAPTCHA sitekey={RECAPTCHA_SITE_KEY} onChange={() => setCaptchaVerified(true)} /> */}
             <SubmitButton type="submit">Sign Up</SubmitButton>
           </form>
         )}
@@ -348,4 +394,9 @@ const RoleOption = styled.button`
     color: white;
     border-color: #3a86ff;
   }
+`;
+
+const PasswordStrength = styled.div`
+  margin-top: 4px;
+  font-size: 0.9rem;
 `;

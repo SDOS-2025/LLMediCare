@@ -9,6 +9,10 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 SECRET_KEY = 'django-insecure-your-secret-key-here'
 
+# settings.py
+
+RECAPTCHA_SECRET_KEY = "6LcOeCkrAAAAAEZxz6eI9xMSEzcW-u1hBolA_1Cn"  # Replace with your secret key
+
 DEBUG = True
 
 ALLOWED_HOSTS = []
