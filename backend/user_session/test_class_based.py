@@ -25,20 +25,24 @@ class UserViewSetTestsWithMixin(APITestCase, UserMixin):
         response = self.client.post(url, data, format='json')
         
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        print(f"Checking if user exists: {User.objects.filter(email='newuser@example.com').exists()}")
         self.assertTrue(User.objects.filter(email='newuser@example.com').exists())
         self.assertEqual(User.objects.get(email='newuser@example.com').name, 'New User')
     
     def test_update_user(self):
         """Test updating an existing user"""
-        url = reverse('user-detail', kwargs={'email': self.patient.email})
+        url = f'/api/user/users/{self.patient.email}/'
         data = {
             'name': 'Updated Name'
         }
-        
+
+        print(f"Checking if user exists: {User.objects.filter(email=self.patient.email).exists()}")
         response = self.client.patch(url, data, format='json')
-        
+        print(response.content)  # Debug output
+
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(User.objects.get(email=self.patient.email).name, 'Updated Name')
+
     
     def test_doctors_list(self):
         """Test getting all doctors list"""
@@ -219,7 +223,7 @@ class NotificationViewSetTestsWithMixin(APITestCase, UserMixin, NotificationMixi
 
     def test_mark_all_read(self):
         """Test marking all notifications as read"""
-        url = reverse('mark-all-notifications-read')
+        url='/api/user/notifications/mark_all_read/'
         
         response = self.client.patch(url + f"?user_email={self.patient.email}")
         

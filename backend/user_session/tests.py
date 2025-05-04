@@ -8,7 +8,7 @@ import json
 
 class UserViewSetTests(APITestCase):
     def setUp(self):
-        # Create test users
+        # Create test users without authentication
         self.doctor = User.objects.create(
             name="Dr. Smith",
             email="doctor@example.com",
@@ -33,28 +33,31 @@ class UserViewSetTests(APITestCase):
         }
         
         response = self.client.post(url, data, format='json')
-        
+        print(f"User created********************: {User.objects.filter(email='newuser@example.com').exists()}")
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(User.objects.count(), 3)
         self.assertEqual(User.objects.get(email='newuser@example.com').name, 'New User')
     
     def test_update_user(self):
         """Test updating an existing user"""
-        url = reverse('user-detail', kwargs={'email': self.patient.email})
+        url='/api/user/users/'+self.patient.email+'/'
+        # url = reverse('user-detail', kwargs={'email': self.patient.email})
         data = {
             'name': 'Updated Name'
         }
-        
+        print(f"Checking if user exists********************: {User.objects.filter(email=self.patient.email).exists()}")
         response = self.client.patch(url, data, format='json')
+        print(response.content)  # Debug output
         
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(User.objects.get(email=self.patient.email).name, 'Updated Name')
     
     def test_delete_user(self):
         """Test deleting a user"""
-        url = reverse('user-detail', kwargs={'email': self.patient.email})
-        
+        url='/api/user/users/'+self.patient.email+'/'
+        print(f"Checking if user exists*********: {User.objects.filter(email=self.patient.email).exists()}")
         response = self.client.delete(url)
+        print(response.content)  # Debug output
         
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         self.assertEqual(User.objects.count(), 1)
@@ -73,9 +76,9 @@ class UserViewSetTests(APITestCase):
     
     def test_fetch_by_email_not_found(self):
         """Test fetching user by email that doesn't exist"""
-        url = reverse('user-fetch-by-email')
+        url = reverse('user-detail', kwargs={'email': 'nonexistent@example.com'})
         
-        response = self.client.get(url, {'email': 'nonexistent@example.com'})
+        response = self.client.get(url)
         
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
     
@@ -635,13 +638,14 @@ class NotificationViewSetTests(APITestCase):
         """Test creating a new notification"""
         url = reverse('create-notification')
         data = {
-            'user_email': self.user.email,
+            'user': self.user.id,
             'title': 'New Notification',
             'message': 'This is a new notification',
             'type': 'reminder'
         }
         
         response = self.client.post(url, data, format='json')
+        print(response.content)
         
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(Notification.objects.count(), 3)
@@ -658,7 +662,7 @@ class NotificationViewSetTests(APITestCase):
 
     def test_mark_all_read(self):
         """Test marking all notifications as read"""
-        url = reverse('mark-all-notifications-read')
+        url='/api/user/notifications/mark_all_read/'
         
         response = self.client.patch(url + f"?user_email={self.user.email}")
         

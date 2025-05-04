@@ -46,8 +46,7 @@ urlpatterns = [
 
     path('notifications/', NotificationViewSet.as_view({'post': 'create_notification'}), name='create-notification'),
     path('notifications/unread/', NotificationViewSet.as_view({'get': 'unread'}), name='unread-notifications'),
-    path('notifications/mark-all-read/', NotificationViewSet.as_view({'patch': 'mark_all_read'}), name='mark-all-notifications-read'),
-    path('notifications/<int:pk>/mark-read/', NotificationViewSet.as_view({'patch': 'mark_read'}), name='mark-notification-read'),
+    # path('notifications/mark-all-read/', NotificationViewSet.as_view({'patch': 'mark_all_read'}), name='mark-all-notifications-read'),
+    # path('notifications/<int:pk>/mark-read/', NotificationViewSet.as_view({'patch': 'mark_read'}), name='mark-notification-read'),
     path('generate-medication-reminders/', NotificationViewSet.as_view({'get': 'generate_medication_reminders'}), name='generate-medication-reminders'),
 ]
-

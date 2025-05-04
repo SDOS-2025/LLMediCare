@@ -17,6 +17,7 @@ class UserViewSet(viewsets.ModelViewSet):
     queryset = User.objects.all()
     serializer_class = UserSerializer
     lookup_field = "email"  # Use email instead of id
+    lookup_value_regex = '[^/]+'  # to allow '@' in the URL
     filter_backends = [filters.SearchFilter]
     search_fields = ['name', 'email']
 
@@ -581,9 +582,8 @@ def doctor_upload_document(request):
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 class NotificationViewSet(viewsets.ModelViewSet):
-    
     serializer_class = NotificationSerializer
-    queryset = Notification.objects.all()  # Add queryset attribute for proper ViewSet operation
+    queryset = Notification.objects.all()
     
     def get_queryset(self):
         user_email = self.request.query_params.get('user_email', None)
@@ -595,7 +595,7 @@ class NotificationViewSet(viewsets.ModelViewSet):
                 return Notification.objects.none()
         return Notification.objects.none()
     
-    @action(detail=False, methods=['post'], url_path='create-notification')
+    @action(detail=False, methods=['post'])
     def create_notification(self, request):
         print("===> Incoming request to create notification")
         print("Request data:", request.data)
@@ -605,21 +605,7 @@ class NotificationViewSet(viewsets.ModelViewSet):
         message = request.data.get('message')
         notification_type = request.data.get('type', 'reminder')
 
-        print(f"user_email: {user_email}")
-        print(f"title: {title}")
-        print(f"message: {message}")
-        print(f"notification_type: {notification_type}")
-
-        appointment_id = request.data.get('appointment_id')
-        medical_record_id = request.data.get('medical_record_id')
-        medication_id = request.data.get('medication_id')
-
-        print(f"appointment_id: {appointment_id}")
-        print(f"medical_record_id: {medical_record_id}")
-        print(f"medication_id: {medication_id}")
-
         if not all([user_email, title, message]):
-            print("Missing required fields: user_email, title, or message")
             return Response(
                 {"error": "user_email, title and message are required"}, 
                 status=status.HTTP_400_BAD_REQUEST
@@ -627,8 +613,6 @@ class NotificationViewSet(viewsets.ModelViewSet):
 
         try:
             user = User.objects.get(email=user_email)
-            print(f"User found: {user}")
-
             notification_data = {
                 'user': user,
                 'title': title,
@@ -638,41 +622,36 @@ class NotificationViewSet(viewsets.ModelViewSet):
             }
 
             # Add related objects if available
+            appointment_id = request.data.get('appointment_id')
+            medical_record_id = request.data.get('medical_record_id')
+            medication_id = request.data.get('medication_id')
+
             if appointment_id:
                 try:
                     appointment = Appointment.objects.get(id=appointment_id)
                     notification_data['appointment'] = appointment
-                    print(f"Appointment linked: {appointment}")
                 except Appointment.DoesNotExist:
-                    print(f"Appointment with id {appointment_id} does not exist")
+                    pass
 
             if medical_record_id:
                 try:
                     medical_record = MedicalRecord.objects.get(id=medical_record_id)
                     notification_data['medical_record'] = medical_record
-                    print(f"Medical Record linked: {medical_record}")
                 except MedicalRecord.DoesNotExist:
-                    print(f"Medical Record with id {medical_record_id} does not exist")
+                    pass
 
             if medication_id:
                 try:
                     medication = Medication.objects.get(id=medication_id)
                     notification_data['medication'] = medication
-                    print(f"Medication linked: {medication}")
                 except Medication.DoesNotExist:
-                    print(f"Medication with id {medication_id} does not exist")
-
-            print("Final notification data before creation:", notification_data)
+                    pass
 
             notification = Notification.objects.create(**notification_data)
             serializer = self.get_serializer(notification)
-
-            print("Notification successfully created:", serializer.data)
-
             return Response(serializer.data, status=status.HTTP_201_CREATED)
 
         except User.DoesNotExist:
-            print(f"User with email {user_email} not found")
             return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
     
     @action(detail=False, methods=['get'])
@@ -687,6 +666,14 @@ class NotificationViewSet(viewsets.ModelViewSet):
             except User.DoesNotExist:
                 return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
         return Response({"error": "User email is required"}, status=status.HTTP_400_BAD_REQUEST)
+    
+    @action(detail=True, methods=['patch'])
+    def mark_read(self, request, pk=None):
+        """Mark a specific notification as read"""
+        notification = self.get_object()
+        notification.read = True
+        notification.save(update_fields=['read'])
+        return Response({"status": "notification marked as read"})
     
     @action(detail=False, methods=['patch'])
     def mark_all_read(self, request):
