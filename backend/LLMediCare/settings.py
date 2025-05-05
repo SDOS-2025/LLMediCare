@@ -21,6 +21,7 @@ ALLOWED_HOSTS = [
     'b574-2405-201-4018-6162-1c04-5bae-f2aa-34b.ngrok-free.app',  # new ngrok tunnel
     '.ngrok-free.app',  # Allow all ngrok domains
     'splendorous-melba-fc5384.netlify.app',  # Netlify frontend
+    'devserver-third-main--newfrontendlm.netlify.app',  # New Netlify domain
 ]
 
 INSTALLED_APPS = [
@@ -80,6 +81,7 @@ DATABASES = {
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",  # Allow requests from React frontend running locally
     "https://splendorous-melba-fc5384.netlify.app",  # Allow requests from Netlify
+    "https://devserver-third-main--newfrontendlm.netlify.app",  # New Netlify domain
 ]
 
 # Additional CORS settings for handling preflight requests
