@@ -1,9 +1,10 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import axios from "axios";
+import { USER_API_URL, AI_API_URL } from "../../utils/environment";
 
 // Base API URL
-const API_BASE1 = "http://localhost:8000/api/ai";
-const API_BASE2 = "http://localhost:8000/api/user";
+const API_BASE1 = AI_API_URL;
+const API_BASE2 = USER_API_URL;
 
 // Configure axios defaults
 axios.defaults.withCredentials = true;

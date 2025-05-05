@@ -8,4 +8,9 @@
   CI = "false"
   
 [build.processing]
-  skip_processing = false 
+  skip_processing = false
+
+[[headers]]
+  for = "/*"
+    [headers.values]
+    Access-Control-Allow-Origin = "*" 
