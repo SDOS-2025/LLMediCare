@@ -1,0 +1,26 @@
+[build]
+  command = "python manage.py collectstatic --noinput"
+  publish = "staticfiles"
+
+# Add CORS headers to all responses
+[[headers]]
+  for = "/*"
+    [headers.values]
+    Access-Control-Allow-Origin = "https://splendorous-melba-fc5384.netlify.app"
+    Access-Control-Allow-Methods = "GET, POST, PUT, DELETE, OPTIONS"
+    Access-Control-Allow-Headers = "Origin, X-Requested-With, Content-Type, Accept, Authorization"
+    Access-Control-Allow-Credentials = "true"
+    Access-Control-Max-Age = "86400"
+
+# Handle OPTIONS requests for CORS preflight
+[[redirects]]
+  from = "/*"
+  to = "/.netlify/functions/cors-handler"
+  status = 200
+  conditions = {method = "OPTIONS"}
+
+# Proxy API requests to Django backend
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/api-proxy"
+  status = 200 

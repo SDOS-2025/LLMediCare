@@ -18,7 +18,7 @@ const api = axios.create({
 const debugRequest = (config) => {
   console.log(`
 ==== DEBUG REQUEST ====
-URL: ${config.baseURL}${config.url}
+URL: ${config.url.startsWith("http") ? config.url : config.baseURL + config.url}
 Method: ${config.method.toUpperCase()}
 Headers: ${JSON.stringify(config.headers)}
 Timeout: ${config.timeout}ms
@@ -66,17 +66,22 @@ api.interceptors.response.use(
   },
   (error) => {
     // Handle common errors here
-    
-        // Add retry functionality for network errors
-        if (error.message.includes("Network Error") || error.code === "ECONNABORTED") {
-          const originalRequest = error.config;
-          if (!originalRequest._retry) {
-            originalRequest._retry = true;
-            console.log("[API] Retrying request after network error...");
-            return new Promise(resolve => setTimeout(() => resolve(api(originalRequest)), 1000));
-          }
-        }
-      if (error.response) {
+
+    // Add retry functionality for network errors
+    if (
+      error.message.includes("Network Error") ||
+      error.code === "ECONNABORTED"
+    ) {
+      const originalRequest = error.config;
+      if (!originalRequest._retry) {
+        originalRequest._retry = true;
+        console.log("[API] Retrying request after network error...");
+        return new Promise((resolve) =>
+          setTimeout(() => resolve(api(originalRequest)), 1000)
+        );
+      }
+    }
+    if (error.response) {
       // Server responded with an error status
       console.error(
         `[API] Server error ${error.response.status} from ${error.config?.url}:`,
