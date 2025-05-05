@@ -8,6 +8,7 @@ const api = axios.create({
   withCredentials: false, // No credentials mode to avoid CORS issues
   headers: {
     "Content-Type": "application/json",
+    'ngrok-skip-browser-warning': 'true',
     Accept: "application/json",
   },
 });

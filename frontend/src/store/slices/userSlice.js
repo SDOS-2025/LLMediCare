@@ -1,9 +1,9 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import api from "../../utils/api-config"; // Import our improved API client
-import { USER_API_URL } from "../../utils/environment";
+import { API_BASE_URL } from "../../utils/environment";
 
 // Base API URL
-const API_BASE = USER_API_URL;
+const API_BASE = API_BASE_URL;
 
 // Async thunk to create a new user
 export const createUser = createAsyncThunk(
@@ -25,7 +25,7 @@ export const deleteUser = createAsyncThunk(
   "user/deleteUser",
   async (userEmail, { rejectWithValue }) => {
     try {
-      await api.delete(`${API_BASE}/users/${userEmail}/`);
+      await api.delete(`${API_BASE}/api/user/users/${userEmail}/`);
       return userEmail;
     } catch (error) {
       return rejectWithValue(error.response?.data || "Error");
@@ -40,7 +40,7 @@ export const fetchUserDetails = createAsyncThunk(
     try {
       console.log(userEmail);
       const response = await api.get(
-        `${API_BASE}/users/fetch-by-email/?email=${userEmail}`
+        `${API_BASE}/api/user/users/fetch-by-email/?email=${userEmail}`
       );
       console.log(response.data);
       return response.data;
@@ -59,7 +59,7 @@ export const updateUserDetails = createAsyncThunk(
     try {
       console.log(userData);
       const response = await api.patch(
-        `${API_BASE}/users/${userData.email}/`,
+        `${API_BASE}/api/user/users/${userData.email}/`,
         userData
       );
       console.log(response.data);
@@ -75,7 +75,7 @@ export const fetchAllDoctors = createAsyncThunk(
   "user/fetchAllDoctors",
   async (_, { rejectWithValue }) => {
     try {
-      const response = await api.get(`${API_BASE}/users/doctors/list/`);
+      const response = await api.get(`${API_BASE}/api/user/users/doctors/list/`);
       console.log("Doctors:", response.data);
       return response.data;
     } catch (error) {
@@ -90,7 +90,7 @@ export const uploadMedicalRecord = createAsyncThunk(
   async ({ appointmentId, recordData, doctorEmail }, { rejectWithValue }) => {
     try {
       const response = await api.post(
-        `${API_BASE}/appointments/${appointmentId}/add_medical_record/?email=${doctorEmail}`,
+        `${API_BASE}/api/user/appointments/${appointmentId}/add_medical_record/?email=${doctorEmail}`,
         recordData
       );
       return response.data;
@@ -111,7 +111,7 @@ export const setMedication = createAsyncThunk(
   ) => {
     try {
       const response = await api.post(
-        `${API_BASE}/appointments/${appointmentId}/add_medication/?email=${doctorEmail}`,
+        `${API_BASE}/api/user/appointments/${appointmentId}/add_medication/?email=${doctorEmail}`,
         medicationData
       );
       return response.data;
@@ -129,7 +129,7 @@ export const doctorUploadDocument = createAsyncThunk(
   async ({ documentData, doctorEmail, patientEmail }, { rejectWithValue }) => {
     try {
       const response = await api.post(
-        `${API_BASE}/documents/doctor/upload/?doctor_email=${doctorEmail}&patient_email=${patientEmail}`,
+        `${API_BASE}/api/user/documents/doctor/upload/?doctor_email=${doctorEmail}&patient_email=${patientEmail}`,
         documentData
       );
       return response.data;
@@ -146,7 +146,7 @@ export const userUploadDocument = createAsyncThunk(
   async ({ documentData, patientEmail }, { dispatch, rejectWithValue }) => {
     try {
       const response = await api.post(
-        `${API_BASE}/records/add_document/${patientEmail}/`,
+        `${API_BASE}/api/user/records/add_document/${patientEmail}/`,
         documentData
       );
       dispatch(fetchPatientRecords(patientEmail)); // Fetch updated records after upload
@@ -164,7 +164,7 @@ export const fetchPatientRecords = createAsyncThunk(
   async (patientEmail, { rejectWithValue }) => {
     try {
       const response = await api.get(
-        `${API_BASE}/records/user/?email=${patientEmail}`
+        `${API_BASE}/api/user/records/user/?email=${patientEmail}`
       );
       return response.data;
     } catch (error) {

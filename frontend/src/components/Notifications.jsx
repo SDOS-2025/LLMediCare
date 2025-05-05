@@ -3,6 +3,8 @@ import styled from 'styled-components';
 import { FaBell, FaTimes } from 'react-icons/fa';
 import { FiCheck } from 'react-icons/fi';
 import axios from 'axios';
+import api from "../utils/api-config"; // Import our improved API client
+import { API_BASE_URL } from "../utils/environment";
 import { useSelector } from 'react-redux';
 
 export default function Notifications({inDropdown}) {
@@ -17,8 +19,8 @@ export default function Notifications({inDropdown}) {
       if (!currentUser) return;
 
       try {
-        const response = await axios.get(
-          `http://localhost:8000/api/user/notifications/unread/?user_email=${currentUser.email}`
+        const response = await api.get(
+          `${API_BASE_URL}/api/user/notifications/unread/?user_email=${currentUser.email}`
         );
         setNotifications(response.data);
       } catch (error) {
@@ -35,8 +37,8 @@ export default function Notifications({inDropdown}) {
 
   const markAllNotificationsAsRead = async () => {
     try {
-      const response = await axios.patch(
-        `http://localhost:8000/api/user/notifications/mark_all_read/`,
+      const response = await api.patch(
+        `${API_BASE_URL} /api/user/notifications/mark_all_read/`,
         null,
         {
           params: {
@@ -172,7 +174,7 @@ export default function Notifications({inDropdown}) {
 // Create notification function - can be exported and used in other components
 export const createNotification = async (recipientEmail, title, message) => {
   try {
-    const response = await axios.post('http://localhost:8000/api/user/notifications/', {
+    const response = await api.post(`${API_BASE_URL}/api/user/notifications/`, {
       user_email: recipientEmail,
       title: title,
       message: message,

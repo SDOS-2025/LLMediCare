@@ -1,10 +1,10 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import api from "../../utils/api-config"; // Import our improved API client
-import { USER_API_URL, AI_API_URL } from "../../utils/environment";
+import { API_BASE_URL } from "../../utils/environment";
 
 // Base API URL
-const API_BASE1 = AI_API_URL;
-const API_BASE2 = USER_API_URL;
+const API_BASE1 = API_BASE_URL; // AI API URL
+const API_BASE2 = API_BASE_URL;
 
 // Remove existing axios config since we're using the API client
 // Configure axios defaults
@@ -47,7 +47,7 @@ export const sendUserInput = createAsyncThunk(
 
       // Then get the AI response
       console.log("Calling AI endpoint with data:", requestData);
-      const response = await api.post(`${API_BASE1}/chat/`, requestData);
+      const response = await api.post(`${API_BASE1}/api/ai/chat/`, requestData);
 
       console.log("Got AI response:", response.data);
 
@@ -110,7 +110,7 @@ export const createNewSession = createAsyncThunk(
 
       console.log("Using email:", userEmail);
 
-      const response = await api.post(`${API_BASE2}/sessions/`, {
+      const response = await api.post(`${API_BASE2}/api/user/sessions/`, {
         user_email: userEmail,
       });
 
@@ -157,7 +157,7 @@ export const getUserSessions = createAsyncThunk(
       }
 
       console.log(`Fetching sessions for user email: ${email}`);
-      const response = await api.get(`${API_BASE2}/sessions/?email=${email}`);
+      const response = await api.get(`${API_BASE2}/api/user/sessions/?email=${email}`);
       console.log("Got user sessions:", response.data);
       return response.data;
     } catch (error) {
@@ -193,12 +193,12 @@ export const addChatToSession = createAsyncThunk(
 
       console.log("Formatted message:", message);
       console.log(
-        `Sending to ${API_BASE2}/sessions/${inputMessage.session_id}/add_chat/`
+        `Sending to ${API_BASE2}/api/user/sessions/${inputMessage.session_id}/add_chat/`
       );
 
       try {
         const response = await api.post(
-          `${API_BASE2}/sessions/${inputMessage.session_id}/add_chat/`,
+          `${API_BASE2}/api/user/sessions/${inputMessage.session_id}/add_chat/`,
           { message: message },
           {
             headers: {
@@ -235,7 +235,7 @@ export const deleteSession = createAsyncThunk(
   "session/deleteSession",
   async (sessionId, { rejectWithValue }) => {
     try {
-      await api.delete(`${API_BASE2}/sessions/${sessionId}/`);
+      await api.delete(`${API_BASE2}/api/user/sessions/${sessionId}/`);
       return sessionId;
     } catch (error) {
       return rejectWithValue(

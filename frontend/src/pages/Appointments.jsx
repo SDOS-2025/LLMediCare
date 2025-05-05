@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import axios from "axios";
+import api from "../utils/api-config"; // Import our improved API client
+import { API_BASE_URL } from "../utils/environment";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import Header from "../components/Header";
@@ -61,7 +63,7 @@ export default function Appointments() {
   useEffect(() => {
     async function fetchDoctors() {
       try {
-        const response = await axios.get('http://localhost:8000/api/user/doctors/list/');
+        const response = await api.get(`${API_BASE_URL}/api/user/doctors/list/`);
         setDoctors(response.data);
         setFilteredDoctors(response.data);
         if (response.data.length > 0) {
@@ -80,8 +82,8 @@ export default function Appointments() {
       if (!currentUser) return;
 
       try {
-        const response = await axios.get(
-          `http://localhost:8000/api/user/appointments/?email=${currentUser.email}`
+        const response = await api.get(
+          `${API_BASE_URL}/api/user/appointments/?email=${currentUser.email}`
         );
         setAppointments(response.data);
       } catch (error) {
@@ -130,11 +132,11 @@ export default function Appointments() {
     try {
       if (currentUser.role === 'patient') {
         formData.append('user_email', currentUser.email);
-        await axios.post('http://localhost:8000/api/user/documents/patient/upload/', formData);
+        await api.post(`${API_BASE_URL}/api/user/documents/patient/upload/`, formData);
       } else {
         formData.append('doctor_email', currentUser.email);
         formData.append('patient_email', currentAppointment?.patient?.email || '');
-        await axios.post('http://localhost:8000/api/user/documents/doctor/upload/', formData);
+        await api.post(`${API_BASE_URL}/api/user/documents/doctor/upload/`, formData);
       }
       
       setDocuments([...documents, { 
@@ -181,8 +183,8 @@ export default function Appointments() {
     
     try {
       // First create the appointment
-      const response = await axios.post(
-        `http://localhost:8000/api/user/appointments/?email=${currentUser.email}`,
+      const response = await api.post(
+        `${API_BASE_URL}/api/user/appointments/?email=${currentUser.email}`,
         payload
       );
       
@@ -216,8 +218,8 @@ export default function Appointments() {
       setDocuments([]);
       
       // Refresh appointments list
-      const appointmentsResponse = await axios.get(
-        `http://localhost:8000/api/user/appointments/?email=${currentUser.email}`
+      const appointmentsResponse = await api.get(
+        `${API_BASE_URL}/api/user/appointments/?email=${currentUser.email}`
       );
       setAppointments(appointmentsResponse.data);
       
@@ -246,8 +248,8 @@ export default function Appointments() {
         return;
       }
 
-      const response = await axios.patch(
-        `http://localhost:8000/api/user/appointments/${appointmentId}/?email=${currentUser.email}`,
+      const response = await api.patch(
+        `${API_BASE_URL}/api/user/appointments/${appointmentId}/?email=${currentUser.email}`,
         { status: action }
       );
 
@@ -297,7 +299,7 @@ export default function Appointments() {
     };
     
     try {
-      await axios.post(`http://localhost:8000/api/user/appointments/${currentAppointment.id}/add_medical_record/?email=${currentUser.email}`, payload);
+      await api.post(`${API_BASE_URL}/api/user/appointments/${currentAppointment.id}/add_medical_record/?email=${currentUser.email}`, payload);
       setMessage('Medical record added successfully.');
       
       // Create notification for patient
@@ -337,7 +339,7 @@ export default function Appointments() {
     };
     
     try {
-      await axios.post(`http://localhost:8000/api/user/appointments/${currentAppointment.id}/add_medication/?email=${currentUser.email}`, payload);
+      await api.post(`${API_BASE_URL}/api/user/appointments/${currentAppointment.id}/add_medication/?email=${currentUser.email}`, payload);
       setMessage('Medication added successfully.');
       
       // Create notification for patient

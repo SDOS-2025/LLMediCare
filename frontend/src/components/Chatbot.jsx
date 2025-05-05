@@ -47,6 +47,8 @@ import {
   removeMessage,
 } from "../store/slices/sessionSlice";
 import axios from "axios";
+import api from "../utils/api-config.js";
+import {API_BASE_URL} from "../utils/environment.js";
 
 const formatResponse = (text) => {
   if (!text) return "";
@@ -749,8 +751,8 @@ export default function Chatbot () {
 
       // Upload the file to the backend
       try {
-        const response = await axios.post(
-          "http://localhost:8000/api/ai/process-medical-report/",
+        const response = await api.post(
+          `${API_BASE_URL}/api/ai/process-medical-report/`,
           formData,
           {
             headers: {
