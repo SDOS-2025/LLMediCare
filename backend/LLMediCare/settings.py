@@ -21,6 +21,7 @@ ALLOWED_HOSTS = [
     'b574-2405-201-4018-6162-1c04-5bae-f2aa-34b.ngrok-free.app',  # new ngrok tunnel
     '.ngrok-free.app',  # Allow all ngrok domains
     'splendorous-melba-fc5384.netlify.app',  # Netlify frontend
+    'devserver-main--splendorous-melba-fc5384.netlify.app',  # Netlify backend
 ]
 
 INSTALLED_APPS = [
@@ -39,7 +40,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware', 
-    'user_session.middleware.CorsHeaderMiddleware',  # Add our custom CORS middleware
+    'user_session.middleware.CORSMiddleware',  # Updated to use the new class name
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -77,12 +78,17 @@ DATABASES = {
 }
 
 # CORS settings
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000",  # Allow requests from React frontend running locally
-    "https://splendorous-melba-fc5384.netlify.app",  # Allow requests from Netlify
-]
+CORS_ALLOW_ALL_ORIGINS = True  # Temporarily allow all origins for testing
+CORS_ALLOW_CREDENTIALS = True
 
-# Additional CORS settings for handling preflight requests
+# Keep these commented until we resolve the issue
+# CORS_ALLOWED_ORIGINS = [
+#     "http://localhost:3000",  # Allow requests from React frontend running locally
+#     "https://splendorous-melba-fc5384.netlify.app",  # Allow requests from Netlify
+# ]
+
+# Allow all headers and methods for testing
+CORS_ALLOW_HEADERS = ['*']
 CORS_ALLOW_METHODS = [
     'DELETE',
     'GET',
@@ -91,21 +97,6 @@ CORS_ALLOW_METHODS = [
     'POST',
     'PUT',
 ]
-
-CORS_ALLOW_HEADERS = [
-    'accept',
-    'accept-encoding',
-    'authorization',
-    'content-type',
-    'dnt',
-    'origin',
-    'user-agent',
-    'x-csrftoken',
-    'x-requested-with',
-]
-
-# Allow cookies in cross-domain requests
-CORS_ALLOW_CREDENTIALS = True
 
 AUTH_PASSWORD_VALIDATORS = [
     {

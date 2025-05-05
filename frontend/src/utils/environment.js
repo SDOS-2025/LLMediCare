@@ -15,6 +15,21 @@ const getRuntimeConfig = () => {
   return null;
 };
 
+// Check for locally stored configuration that overrides the default
+const getLocalConfig = () => {
+  if (typeof window !== "undefined" && window.localStorage) {
+    const localConfig = window.localStorage.getItem("APP_CONFIG");
+    if (localConfig) {
+      try {
+        return JSON.parse(localConfig);
+      } catch (e) {
+        console.error("Error parsing local config:", e);
+      }
+    }
+  }
+  return null;
+};
+
 // Base API URLs
 const ENVIRONMENTS = {
   development: {
@@ -24,7 +39,7 @@ const ENVIRONMENTS = {
   },
   production: {
     API_BASE_URL:
-      "https://b574-2405-201-4018-6162-1c04-5bae-f2aa-34b.ngrok-free.app",
+      "https://devserver-main--splendorous-melba-fc5384.netlify.app",
     USER_API_PATH: "/api/user",
     AI_API_PATH: "/api/ai",
   },
@@ -34,10 +49,24 @@ const ENVIRONMENTS = {
 const ENV =
   process.env.NODE_ENV === "production" ? "production" : "development";
 
-// First try to use runtime config, then fall back to environment config
-export const config = getRuntimeConfig() || ENVIRONMENTS[ENV];
+// Priority: 1. Local storage config, 2. Runtime config, 3. Environment config
+export const config =
+  getLocalConfig() || getRuntimeConfig() || ENVIRONMENTS[ENV];
 
 // Convenience exports for the most commonly used URLs
 export const API_BASE_URL = config.API_BASE_URL;
 export const USER_API_URL = `${config.API_BASE_URL}${config.USER_API_PATH}`;
 export const AI_API_URL = `${config.API_BASE_URL}${config.AI_API_PATH}`;
+
+// Helper function to update the API URL at runtime
+export const updateApiUrl = (newUrl) => {
+  if (typeof window !== "undefined" && window.localStorage) {
+    const updatedConfig = { ...config, API_BASE_URL: newUrl };
+    window.localStorage.setItem("APP_CONFIG", JSON.stringify(updatedConfig));
+    console.log(
+      `API URL updated to: ${newUrl}. Refresh the page to apply changes.`
+    );
+    return true;
+  }
+  return false;
+};

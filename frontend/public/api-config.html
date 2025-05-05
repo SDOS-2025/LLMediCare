@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LLMediCare API Configuration</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+      line-height: 1.6;
+      color: #333;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+
+    h1 {
+      color: #2c3e50;
+      border-bottom: 2px solid #eee;
+      padding-bottom: 10px;
+    }
+
+    .card {
+      background: #f9f9f9;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 20px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    input[type="text"] {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 16px;
+      margin-bottom: 10px;
+    }
+
+    button {
+      background: #3498db;
+      color: white;
+      border: none;
+      padding: 10px 15px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 16px;
+    }
+
+    button:hover {
+      background: #2980b9;
+    }
+
+    .success {
+      color: #27ae60;
+      font-weight: bold;
+    }
+
+    .error {
+      color: #e74c3c;
+      font-weight: bold;
+    }
+
+    .current {
+      font-family: monospace;
+      background: #eee;
+      padding: 10px;
+      border-radius: 4px;
+      word-break: break-all;
+    }
+  </style>
+</head>
+
+<body>
+  <h1>LLMediCare API Configuration</h1>
+
+  <div class="card">
+    <h2>Current API URL</h2>
+    <div id="current-url" class="current">Loading...</div>
+  </div>
+
+  <div class="card">
+    <h2>Update API URL</h2>
+    <p>Enter the new backend API URL (e.g., your ngrok URL):</p>
+    <input type="text" id="new-url" placeholder="https://example.ngrok-free.app">
+    <button id="update-btn">Update API URL</button>
+    <p id="update-status"></p>
+  </div>
+
+  <div class="card">
+    <h2>Reset to Default</h2>
+    <p>Reset to the default API URL for the current environment:</p>
+    <button id="reset-btn">Reset to Default</button>
+    <p id="reset-status"></p>
+  </div>
+
+  <div class="card">
+    <h2>Test Connection</h2>
+    <p>Test connection to the backend API:</p>
+    <button id="test-btn">Test Connection</button>
+    <p id="test-status"></p>
+  </div>
+
+  <script>
+    // Load the environment.js script
+    const script = document.createElement('script');
+    script.src = '../src/utils/environment.js';
+    script.type = 'module';
+    document.head.appendChild(script);
+
+    // Wait for a moment to ensure environment.js is loaded
+    setTimeout(() => {
+      // Function to get the current config
+      const getConfig = () => {
+        // Try localStorage first
+        try {
+          const localConfig = localStorage.getItem('APP_CONFIG');
+          if (localConfig) {
+            return JSON.parse(localConfig);
+          }
+        } catch (e) {
+          console.error('Error parsing stored config:', e);
+        }
+
+        // Try window.APP_CONFIG next
+        if (window.APP_CONFIG) {
+          return window.APP_CONFIG;
+        }
+
+        // Fall back to embedded default
+        return {
+          API_BASE_URL: 'http://localhost:8000'
+        };
+      };
+
+      // Display the current URL
+      const displayCurrentUrl = () => {
+        const config = getConfig();
+        document.getElementById('current-url').textContent = config.API_BASE_URL || 'Not set';
+      };
+
+      // Initialize the display
+      displayCurrentUrl();
+
+      // Update button handler
+      document.getElementById('update-btn').addEventListener('click', () => {
+        const newUrl = document.getElementById('new-url').value.trim();
+        if (!newUrl) {
+          document.getElementById('update-status').textContent = 'Please enter a valid URL';
+          document.getElementById('update-status').className = 'error';
+          return;
+        }
+
+        try {
+          // Create a URL object to validate
+          new URL(newUrl);
+
+          const config = getConfig();
+          const updatedConfig = { ...config, API_BASE_URL: newUrl };
+          localStorage.setItem('APP_CONFIG', JSON.stringify(updatedConfig));
+
+          document.getElementById('update-status').textContent = 'API URL updated successfully. Refresh the app to apply changes.';
+          document.getElementById('update-status').className = 'success';
+          displayCurrentUrl();
+        } catch (e) {
+          document.getElementById('update-status').textContent = 'Invalid URL format';
+          document.getElementById('update-status').className = 'error';
+        }
+      });
+
+      // Reset button handler
+      document.getElementById('reset-btn').addEventListener('click', () => {
+        localStorage.removeItem('APP_CONFIG');
+        document.getElementById('reset-status').textContent = 'Reset to default URL. Refresh the app to apply changes.';
+        document.getElementById('reset-status').className = 'success';
+        displayCurrentUrl();
+      });
+
+      // Test connection button handler
+      document.getElementById('test-btn').addEventListener('click', () => {
+        const config = getConfig();
+        const apiUrl = config.API_BASE_URL;
+        const testStatus = document.getElementById('test-status');
+
+        testStatus.textContent = 'Testing connection...';
+        testStatus.className = '';
+
+        // Test the admin URL first (should always respond)
+        fetch(`${apiUrl}/admin/`, {
+          method: 'GET',
+          mode: 'no-cors' // Try no-cors mode to avoid CORS issues in the test
+        })
+          .then(response => {
+            testStatus.textContent = 'Server is responding! Backend is accessible.';
+            testStatus.className = 'success';
+
+            // Now try an API endpoint with proper CORS
+            return fetch(`${apiUrl}/api/user/users/fetch-by-email/?email=test@example.com`, {
+              headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+              }
+            });
+          })
+          .then(response => {
+            if (response.ok) {
+              testStatus.textContent += ' API endpoint is working correctly!';
+            } else {
+              testStatus.textContent += ' Server responded, but the API returned an error.';
+            }
+          })
+          .catch(error => {
+            // If the first request failed, it's likely a connection issue
+            testStatus.textContent = `Error connecting to server: ${error.message}`;
+            testStatus.className = 'error';
+          });
+      });
+    }, 500);
+  </script>
+</body>
+
+</html>
