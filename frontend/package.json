@@ -56,5 +56,18 @@
       "last 1 firefox version",
       "last 1 safari version"
     ]
+  },
+  "overrides": {
+    "rimraf": "^4.0.0",
+    "glob": "^9.0.0",
+    "sourcemap-codec": "@jridgewell/sourcemap-codec@^1.4.15",
+    "workbox-cacheable-response": "^7.0.0",
+    "eslint": "^8.57.1",
+    "@babel/plugin-proposal-private-methods": "^7.18.6",
+    "@babel/plugin-proposal-optional-chaining": "^7.21.0",
+    "@babel/plugin-proposal-numeric-separator": "^7.18.6",
+    "@babel/plugin-proposal-nullish-coalescing-operator": "^7.18.6",
+    "@babel/plugin-proposal-class-properties": "^7.18.6",
+    "@babel/plugin-proposal-private-property-in-object": "^7.21.11"
   }
 }
