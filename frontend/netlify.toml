@@ -5,6 +5,7 @@
 [build.environment]
   NODE_VERSION = "18.16.0"
   NPM_VERSION = "9.5.1"
+  CI = "false"
   
 [build.processing]
   skip_processing = false 
