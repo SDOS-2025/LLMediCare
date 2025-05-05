@@ -15,7 +15,13 @@ RECAPTCHA_SECRET_KEY = "6LcOeCkrAAAAAEZxz6eI9xMSEzcW-u1hBolA_1Cn"  # Replace wit
 
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = [
+    'localhost',
+    '127.0.0.1',
+    'fb0a-2405-201-4018-6162-1c04-5bae-f2aa-34b.ngrok-free.app',  # ngrok tunnel
+    '.ngrok-free.app',  # Allow all ngrok domains
+    'splendorous-melba-fc5384.netlify.app',  # Netlify frontend
+]
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -33,6 +39,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware', 
+    'user_session.middleware.CorsHeaderMiddleware',  # Add our custom CORS middleware
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -70,7 +77,8 @@ DATABASES = {
 }
 
 CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000",  # Allow requests from React frontend
+    "http://localhost:3000",  # Allow requests from React frontend running locally
+    "https://splendorous-melba-fc5384.netlify.app",  # Allow requests from Netlify
 ]
 
 # Alternatively, allow all origins (not recommended for production)

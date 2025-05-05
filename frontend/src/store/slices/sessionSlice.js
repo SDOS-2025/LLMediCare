@@ -7,7 +7,7 @@ const API_BASE1 = AI_API_URL;
 const API_BASE2 = USER_API_URL;
 
 // Configure axios defaults
-axios.defaults.withCredentials = true;
+// axios.defaults.withCredentials = true;  // Removing this line as it's causing CORS issues
 axios.defaults.timeout = 30000; // 30 seconds timeout
 
 // Add request interceptor for better error tracking
