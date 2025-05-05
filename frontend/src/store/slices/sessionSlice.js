@@ -1,54 +1,18 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
-import axios from "axios";
+import api from "../../utils/api-config"; // Import our improved API client
 import { USER_API_URL, AI_API_URL } from "../../utils/environment";
 
 // Base API URL
 const API_BASE1 = AI_API_URL;
 const API_BASE2 = USER_API_URL;
 
+// Remove existing axios config since we're using the API client
 // Configure axios defaults
 // axios.defaults.withCredentials = true;  // Removing this line as it's causing CORS issues
-axios.defaults.timeout = 30000; // 30 seconds timeout
+// axios.defaults.timeout = 30000; // 30 seconds timeout
 
-// Add request interceptor for better error tracking
-axios.interceptors.request.use(
-  (config) => {
-    console.log(
-      `Making ${config.method.toUpperCase()} request to ${config.url}`
-    );
-    return config;
-  },
-  (error) => {
-    console.error("Request error:", error);
-    return Promise.reject(error);
-  }
-);
-
-// Add response interceptor for better error tracking
-axios.interceptors.response.use(
-  (response) => {
-    console.log(
-      `Response from ${response.config.url} with status ${response.status}`
-    );
-    return response;
-  },
-  (error) => {
-    if (error.response) {
-      console.error(
-        `Response error ${error.response.status} from ${error.config?.url}:`,
-        error.response.data
-      );
-    } else if (error.request) {
-      console.error(
-        `No response received for request to ${error.config?.url}:`,
-        error.request
-      );
-    } else {
-      console.error("Request setup error:", error.message);
-    }
-    return Promise.reject(error);
-  }
-);
+// Remove existing axios interceptors since they're in the API client
+// We don't need these anymore since they're in the API client
 
 export const sendUserInput = createAsyncThunk(
   "session/sendUserInput",
@@ -83,7 +47,7 @@ export const sendUserInput = createAsyncThunk(
 
       // Then get the AI response
       console.log("Calling AI endpoint with data:", requestData);
-      const response = await axios.post(`${API_BASE1}/chat/`, requestData);
+      const response = await api.post(`${API_BASE1}/chat/`, requestData);
 
       console.log("Got AI response:", response.data);
 
@@ -146,7 +110,7 @@ export const createNewSession = createAsyncThunk(
 
       console.log("Using email:", userEmail);
 
-      const response = await axios.post(`${API_BASE2}/sessions/`, {
+      const response = await api.post(`${API_BASE2}/sessions/`, {
         user_email: userEmail,
       });
 
@@ -193,7 +157,7 @@ export const getUserSessions = createAsyncThunk(
       }
 
       console.log(`Fetching sessions for user email: ${email}`);
-      const response = await axios.get(`${API_BASE2}/sessions/?email=${email}`);
+      const response = await api.get(`${API_BASE2}/sessions/?email=${email}`);
       console.log("Got user sessions:", response.data);
       return response.data;
     } catch (error) {
@@ -233,7 +197,7 @@ export const addChatToSession = createAsyncThunk(
       );
 
       try {
-        const response = await axios.post(
+        const response = await api.post(
           `${API_BASE2}/sessions/${inputMessage.session_id}/add_chat/`,
           { message: message },
           {
@@ -271,7 +235,7 @@ export const deleteSession = createAsyncThunk(
   "session/deleteSession",
   async (sessionId, { rejectWithValue }) => {
     try {
-      await axios.delete(`${API_BASE2}/sessions/${sessionId}/`);
+      await api.delete(`${API_BASE2}/sessions/${sessionId}/`);
       return sessionId;
     } catch (error) {
       return rejectWithValue(

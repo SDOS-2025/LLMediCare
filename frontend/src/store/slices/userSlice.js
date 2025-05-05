@@ -1,5 +1,5 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
-import axios from "axios";
+import api from "../../utils/api-config"; // Import our improved API client
 import { USER_API_URL } from "../../utils/environment";
 
 // Base API URL
@@ -11,7 +11,7 @@ export const createUser = createAsyncThunk(
   async (userData, { rejectWithValue }) => {
     try {
       console.log(userData);
-      const response = await axios.post(`${API_BASE}/users/`, userData);
+      const response = await api.post(`${API_BASE}/users/`, userData);
       console.log(response.data);
       return response.data;
     } catch (error) {
@@ -25,7 +25,7 @@ export const deleteUser = createAsyncThunk(
   "user/deleteUser",
   async (userEmail, { rejectWithValue }) => {
     try {
-      await axios.delete(`${API_BASE}/users/${userEmail}/`);
+      await api.delete(`${API_BASE}/users/${userEmail}/`);
       return userEmail;
     } catch (error) {
       return rejectWithValue(error.response?.data || "Error");
@@ -39,7 +39,7 @@ export const fetchUserDetails = createAsyncThunk(
   async (userEmail, { rejectWithValue }) => {
     try {
       console.log(userEmail);
-      const response = await axios.get(
+      const response = await api.get(
         `${API_BASE}/users/fetch-by-email/?email=${userEmail}`
       );
       console.log(response.data);
@@ -58,7 +58,7 @@ export const updateUserDetails = createAsyncThunk(
   async (userData, { rejectWithValue }) => {
     try {
       console.log(userData);
-      const response = await axios.patch(
+      const response = await api.patch(
         `${API_BASE}/users/${userData.email}/`,
         userData
       );
@@ -75,7 +75,7 @@ export const fetchAllDoctors = createAsyncThunk(
   "user/fetchAllDoctors",
   async (_, { rejectWithValue }) => {
     try {
-      const response = await axios.get(`${API_BASE}/users/doctors/list/`);
+      const response = await api.get(`${API_BASE}/users/doctors/list/`);
       console.log("Doctors:", response.data);
       return response.data;
     } catch (error) {
@@ -89,7 +89,7 @@ export const uploadMedicalRecord = createAsyncThunk(
   "user/uploadMedicalRecord",
   async ({ appointmentId, recordData, doctorEmail }, { rejectWithValue }) => {
     try {
-      const response = await axios.post(
+      const response = await api.post(
         `${API_BASE}/appointments/${appointmentId}/add_medical_record/?email=${doctorEmail}`,
         recordData
       );
@@ -110,7 +110,7 @@ export const setMedication = createAsyncThunk(
     { rejectWithValue }
   ) => {
     try {
-      const response = await axios.post(
+      const response = await api.post(
         `${API_BASE}/appointments/${appointmentId}/add_medication/?email=${doctorEmail}`,
         medicationData
       );
@@ -128,7 +128,7 @@ export const doctorUploadDocument = createAsyncThunk(
   "user/doctorUploadDocument",
   async ({ documentData, doctorEmail, patientEmail }, { rejectWithValue }) => {
     try {
-      const response = await axios.post(
+      const response = await api.post(
         `${API_BASE}/documents/doctor/upload/?doctor_email=${doctorEmail}&patient_email=${patientEmail}`,
         documentData
       );
@@ -145,7 +145,7 @@ export const userUploadDocument = createAsyncThunk(
   "user/userUploadDocument",
   async ({ documentData, patientEmail }, { dispatch, rejectWithValue }) => {
     try {
-      const response = await axios.post(
+      const response = await api.post(
         `${API_BASE}/records/add_document/${patientEmail}/`,
         documentData
       );
@@ -163,7 +163,7 @@ export const fetchPatientRecords = createAsyncThunk(
   "user/fetchPatientRecords",
   async (patientEmail, { rejectWithValue }) => {
     try {
-      const response = await axios.get(
+      const response = await api.get(
         `${API_BASE}/records/user/?email=${patientEmail}`
       );
       return response.data;
